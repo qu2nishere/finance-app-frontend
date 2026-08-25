@@ -1,0 +1,77 @@
+# ==========================================
+# Frontend Git Ignore (Android / Kotlin / Jetpack Compose)
+# ==========================================
+
+# --- Built and Intermediate Files ---
+build/
+**/build/
+/build
+/app/build
+bin/
+**/bin/
+out/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# --- Gradle & Kotlin Cache ---
+.gradle/
+**/.gradle/
+.kotlin/
+**/.kotlin/
+
+# Keep Gradle Wrapper jar
+!gradle/wrapper/gradle-wrapper.jar
+!**/gradle-wrapper.jar
+
+# --- Local Configuration & SDK Paths ---
+local.properties
+/local.properties
+
+# --- IntelliJ IDEA / Android Studio ---
+.idea/
+**/.idea/
+*.iml
+**/*.iml
+*.ipr
+*.iws
+*.class
+
+# --- VS Code ---
+.vscode/
+**/.vscode/
+
+# --- Package / Binary Outputs ---
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# --- Keystore & Certificates (DO NOT COMMIT) ---
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# --- Logs & Profiling ---
+*.log
+**/*.log
+profileOutput/
+
+# --- OS Specific Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# --- Temporary & Backup Files ---
+*.tmp
+*.bak
+*.swp
+*~
