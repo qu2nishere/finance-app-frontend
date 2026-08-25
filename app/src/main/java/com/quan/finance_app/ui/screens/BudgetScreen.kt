@@ -28,7 +28,10 @@ import androidx.compose.ui.unit.sp
 import com.quan.finance_app.ui.theme.*
 
 @Composable
-fun BudgetScreen(modifier: Modifier = Modifier) {
+fun BudgetScreen(
+    onNavigateToSavingsGoals: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -39,7 +42,7 @@ fun BudgetScreen(modifier: Modifier = Modifier) {
         // 1. Top Header: Title "Ngân sách" + "+ Thêm" Button
         item {
             BudgetHeader(
-                onAddClick = { /* Handle Add Budget / Goal */ }
+                onAddClick = { onNavigateToSavingsGoals() }
             )
         }
 
@@ -132,19 +135,35 @@ fun BudgetScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        // 5. Section "Mục tiêu tiết kiệm"
+        // 5. Section "Mục tiêu tiết kiệm" with navigation button
         item {
-            Text(
-                text = "Mục tiêu tiết kiệm",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontCore,
-                color = MoneyFlowTheme.colors.textPrimary,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Mục tiêu tiết kiệm",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontCore,
+                    color = MoneyFlowTheme.colors.textPrimary
+                )
+
+                Text(
+                    text = "Tất cả >",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontCore,
+                    color = Blue600,
+                    modifier = Modifier.clickable { onNavigateToSavingsGoals() }
+                )
+            }
         }
 
-        // 6. Savings Goals Cards
+        // 6. Savings Goals Cards (Clickable to open Savings Goals)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -152,7 +171,9 @@ fun BudgetScreen(modifier: Modifier = Modifier) {
             ) {
                 // Goal 1: Du lịch Đà Lạt
                 SavingsGoalCard(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onNavigateToSavingsGoals() },
                     icon = Icons.Outlined.CardGiftcard,
                     iconBg = Color(0xFFE8F8F0),
                     iconTint = Grow500,
@@ -164,7 +185,9 @@ fun BudgetScreen(modifier: Modifier = Modifier) {
 
                 // Goal 2: Quỹ dự phòng
                 SavingsGoalCard(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onNavigateToSavingsGoals() },
                     icon = Icons.Outlined.Shield,
                     iconBg = Color(0xFFF0F4F8),
                     iconTint = Ink600,
@@ -225,7 +248,6 @@ fun TotalMonthlyBudgetCard() {
         border = BorderStroke(1.dp, Color(0xFFF0F3F8))
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // Header: "Ngân sách tháng 8" & "còn 12 ngày"
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,7 +269,6 @@ fun TotalMonthlyBudgetCard() {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Amount: "9,7tr / 12,0tr"
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "9,7tr",
@@ -269,7 +290,7 @@ fun TotalMonthlyBudgetCard() {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Progress Bar (81% used)
+            // Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -286,7 +307,6 @@ fun TotalMonthlyBudgetCard() {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Subtitle: "Đã dùng 81% · còn 2.288.000₫ (~190k/ngày)"
             Text(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
@@ -333,7 +353,6 @@ fun CategoryBudgetCard(
         border = BorderStroke(if (isOverBudget) 1.5.dp else 1.dp, borderColor)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Row Top: Icon + Title --- Amount
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -374,7 +393,6 @@ fun CategoryBudgetCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -389,7 +407,6 @@ fun CategoryBudgetCard(
                 )
             }
 
-            // Alert Line if Over Budget
             if (isOverBudget) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -458,7 +475,6 @@ fun SavingsGoalCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

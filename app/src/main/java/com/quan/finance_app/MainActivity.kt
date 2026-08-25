@@ -4,15 +4,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,11 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.quan.finance_app.ui.screens.AddTransactionScreen
-import com.quan.finance_app.ui.screens.BudgetScreen
-import com.quan.finance_app.ui.screens.HomeScreen
-import com.quan.finance_app.ui.screens.ProfileScreen
-import com.quan.finance_app.ui.screens.ReportScreen
+import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
 class MainActivity : ComponentActivity() {
@@ -39,10 +35,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+enum class BudgetNavState {
+    MAIN,
+    SAVINGS_GOALS,
+    EDIT_GOAL
+}
+
 @Composable
 fun MainApp() {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var showAddSheet by remember { mutableStateOf(false) }
+    var budgetNavState by remember { mutableStateOf(BudgetNavState.MAIN) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -51,7 +54,12 @@ fun MainApp() {
             bottomBar = {
                 CustomBottomNav(
                     selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
+                    onTabSelected = { 
+                        selectedTab = it
+                        if (it != 2) {
+                            budgetNavState = BudgetNavState.MAIN
+                        }
+                    },
                     onAddClick = { showAddSheet = true }
                 )
             }
@@ -60,7 +68,20 @@ fun MainApp() {
                 when (selectedTab) {
                     0 -> HomeScreen()
                     1 -> ReportScreen()
-                    2 -> BudgetScreen()
+                    2 -> {
+                        when (budgetNavState) {
+                            BudgetNavState.MAIN -> BudgetScreen(
+                                onNavigateToSavingsGoals = { budgetNavState = BudgetNavState.SAVINGS_GOALS }
+                            )
+                            BudgetNavState.SAVINGS_GOALS -> SavingsGoalsScreen(
+                                onBack = { budgetNavState = BudgetNavState.MAIN },
+                                onNavigateToEditGoal = { budgetNavState = BudgetNavState.EDIT_GOAL }
+                            )
+                            BudgetNavState.EDIT_GOAL -> EditGoalScreen(
+                                onBack = { budgetNavState = BudgetNavState.SAVINGS_GOALS }
+                            )
+                        }
+                    }
                     3 -> ProfileScreen()
                 }
             }
@@ -80,7 +101,7 @@ fun CustomBottomNav(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().height(80.dp),
-        color = MoneyFlowTheme.colors.surfaceCard, // Trắng
+        color = MoneyFlowTheme.colors.surfaceCard,
         shadowElevation = 16.dp,
         tonalElevation = 0.dp,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
@@ -105,7 +126,7 @@ fun CustomBottomNav(
                 modifier = Modifier.weight(1f)
             )
             
-            // Nút Add nằm hoàn toàn bên trong thanh Nav
+            // Nút Add
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center

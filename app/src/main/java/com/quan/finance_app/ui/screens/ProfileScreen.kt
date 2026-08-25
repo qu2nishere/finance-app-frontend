@@ -1,61 +1,451 @@
 package com.quan.finance_app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.quan.finance_app.ui.components.core.MoneyFlowCard
-import com.quan.finance_app.ui.theme.MoneyFlowTheme
+import androidx.compose.ui.unit.sp
+import com.quan.finance_app.ui.theme.*
 
 @Composable
 fun ProfileScreen(modifier: Modifier = Modifier) {
-    var darkMode by remember { mutableStateOf(false) }
+    var isDailyReminderEnabled by remember { mutableStateOf(true) }
+    var isBudgetAlertEnabled by remember { mutableStateOf(true) }
+    var isDarkModeEnabled by remember { mutableStateOf(false) }
+    var isBiometricLockEnabled by remember { mutableStateOf(true) }
 
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(MoneyFlowTheme.spacing.gutterScreen)
+            .background(Color(0xFFF7F9FC)),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        // 1. Header: "Cài đặt"
+        item {
+            Text(
+                text = "Cài đặt",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontCore,
+                color = MoneyFlowTheme.colors.textPrimary
+            )
+        }
+
+        // 2. User Profile Card
+        item {
+            UserProfileCard(
+                name = "Nguyễn Minh",
+                email = "minh@email.com",
+                plan = "Gói miễn phí",
+                onClick = { /* Open user profile detail */ }
+            )
+        }
+
+        // 3. Section 1: TIỀN & DANH MỤC
+        item {
+            SectionHeader(title = "TIỀN & DANH MỤC")
+        }
+
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    // Danh mục và Hạn mức
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.GridView,
+                        title = "Danh mục và Hạn mức",
+                        trailingText = "14 · 5 hạn mức",
+                        onClick = {}
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Ví & tài khoản
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.AccountBalanceWallet,
+                        title = "Ví & tài khoản",
+                        trailingText = "3",
+                        onClick = {}
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Giao dịch định kỳ
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.Sync,
+                        title = "Giao dịch định kỳ",
+                        trailingText = null,
+                        onClick = {}
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Mục tiêu tiết kiệm
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.Savings,
+                        title = "Mục tiêu tiết kiệm",
+                        trailingText = "3 đang chạy",
+                        onClick = {}
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Đơn vị tiền tệ
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.Payments,
+                        title = "Đơn vị tiền tệ",
+                        trailingText = "VND ₫",
+                        onClick = {}
+                    )
+                }
+            }
+        }
+
+        // 4. Section 2: ỨNG DỤNG
+        item {
+            SectionHeader(title = "ỨNG DỤNG")
+        }
+
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    // Nhắc nhập chi tiêu hằng ngày
+                    SettingToggleItem(
+                        icon = Icons.Outlined.Notifications,
+                        title = "Nhắc nhập chi tiêu hằng ngày",
+                        subtitle = "21:00",
+                        isChecked = isDailyReminderEnabled,
+                        onCheckedChange = { isDailyReminderEnabled = it }
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Cảnh báo vượt ngân sách
+                    SettingToggleItem(
+                        icon = Icons.Outlined.WarningAmber,
+                        title = "Cảnh báo vượt ngân sách",
+                        subtitle = null,
+                        isChecked = isBudgetAlertEnabled,
+                        onCheckedChange = { isBudgetAlertEnabled = it }
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Chế độ tối
+                    SettingToggleItem(
+                        icon = Icons.Outlined.Visibility,
+                        title = "Chế độ tối",
+                        subtitle = null,
+                        isChecked = isDarkModeEnabled,
+                        onCheckedChange = { isDarkModeEnabled = it }
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Khoá bằng Face ID / PIN
+                    SettingToggleItem(
+                        icon = Icons.Outlined.Lock,
+                        title = "Khoá bằng Face ID / PIN",
+                        subtitle = null,
+                        isChecked = isBiometricLockEnabled,
+                        onCheckedChange = { isBiometricLockEnabled = it }
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Ngôn ngữ
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.Language,
+                        title = "Ngôn ngữ",
+                        trailingText = "Tiếng Việt",
+                        onClick = {}
+                    )
+                }
+            }
+        }
+
+        // 5. Section 3: DỮ LIỆU
+        item {
+            SectionHeader(title = "DỮ LIỆU")
+        }
+
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    // Xuất Excel / CSV
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.FileDownload,
+                        title = "Xuất Excel / CSV",
+                        trailingText = null,
+                        onClick = {}
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Sao lưu & đồng bộ
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.CloudSync,
+                        title = "Sao lưu & đồng bộ",
+                        trailingText = "Hôm nay",
+                        trailingTextColor = Grow500,
+                        onClick = {}
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
+                    // Xoá toàn bộ dữ liệu
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.DeleteOutline,
+                        iconBg = Color(0xFFFFF0F2),
+                        iconTint = Alert500,
+                        title = "Xoá toàn bộ dữ liệu",
+                        titleColor = Alert500,
+                        trailingText = null,
+                        onClick = {}
+                    )
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Sub-components
+// -------------------------------------------------------------------------
+
+@Composable
+fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontCore,
+        color = MoneyFlowTheme.colors.textSecondary,
+        modifier = Modifier.padding(top = 6.dp)
+    )
+}
+
+@Composable
+fun UserProfileCard(
+    name: String,
+    email: String,
+    plan: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(Color(0xFFFFEDE6), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = "Avatar",
+                    tint = Heat500,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    fontFamily = FontCore,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = MoneyFlowTheme.colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "$email · $plan",
+                    fontFamily = FontCore,
+                    fontSize = 12.sp,
+                    color = MoneyFlowTheme.colors.textSecondary
+                )
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = "Chi tiết",
+                tint = MoneyFlowTheme.colors.textSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun SettingNavigationRow(
+    icon: ImageVector,
+    iconBg: Color = Color(0xFFEEF4FF),
+    iconTint: Color = Blue500,
+    title: String,
+    titleColor: Color = MoneyFlowTheme.colors.textPrimary,
+    trailingText: String? = null,
+    trailingTextColor: Color = MoneyFlowTheme.colors.textSecondary,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(64.dp), tint = MoneyFlowTheme.colors.textSecondary)
-            Spacer(modifier = Modifier.width(16.dp))
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(iconBg, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                fontFamily = FontCore,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
+                color = titleColor
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (trailingText != null) {
+                Text(
+                    text = trailingText,
+                    fontFamily = FontCore,
+                    fontSize = 13.sp,
+                    color = trailingTextColor
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = "Mở",
+                tint = MoneyFlowTheme.colors.textSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun SettingToggleItem(
+    icon: ImageVector,
+    iconBg: Color = Color(0xFFEEF4FF),
+    iconTint: Color = Blue500,
+    title: String,
+    subtitle: String? = null,
+    isChecked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(iconBg, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text(text = "Nguyễn Minh Quân", style = MoneyFlowTheme.typography.title2, color = MoneyFlowTheme.colors.textPrimary)
-                Text(text = "quan@example.com", style = MoneyFlowTheme.typography.body, color = MoneyFlowTheme.colors.textSecondary)
+                Text(
+                    text = title,
+                    fontFamily = FontCore,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    color = MoneyFlowTheme.colors.textPrimary
+                )
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        fontFamily = FontCore,
+                        fontSize = 12.sp,
+                        color = MoneyFlowTheme.colors.textSecondary
+                    )
+                }
             }
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        MoneyFlowCard {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Giao diện tối", style = MoneyFlowTheme.typography.body)
-                    Switch(checked = darkMode, onCheckedChange = { darkMode = it })
-                }
-                Divider(color = MoneyFlowTheme.colors.borderSubtle)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Đăng xuất", style = MoneyFlowTheme.typography.body, color = MoneyFlowTheme.colors.stateDanger)
-                }
-            }
-        }
+
+        Switch(
+            checked = isChecked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Blue500,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = Color(0xFFDCE2EC),
+                uncheckedBorderColor = Color.Transparent
+            )
+        )
     }
 }
