@@ -33,6 +33,7 @@ fun EditIncomeCategoryScreen(
     categoryName: String = "Lương",
     onBack: () -> Unit = {},
     onAddTransaction: () -> Unit = {},
+    onOpenAutoSave: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val iconOptions = listOf(
@@ -328,7 +329,8 @@ fun EditIncomeCategoryScreen(
                         title = "Tự trích vào mục tiêu",
                         subtitle = "20% → Quỹ dự phòng",
                         checked = autoSaveEnabled,
-                        onCheckedChange = { autoSaveEnabled = it }
+                        onCheckedChange = { autoSaveEnabled = it },
+                        onClick = onOpenAutoSave
                     )
                 }
             }
@@ -520,11 +522,13 @@ private fun IncomeToggleRow(
     title: String,
     subtitle: String?,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

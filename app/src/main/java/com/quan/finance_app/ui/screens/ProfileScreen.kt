@@ -25,6 +25,10 @@ import com.quan.finance_app.ui.theme.*
 fun ProfileScreen(
     onNavigateToCategories: () -> Unit = {},
     onNavigateToSavingsGoals: () -> Unit = {},
+    onNavigateToWallets: () -> Unit = {},
+    onNavigateToRecurring: () -> Unit = {},
+    onNavigateToExport: () -> Unit = {},
+    onNavigateToAccount: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isDailyReminderEnabled by remember { mutableStateOf(true) }
@@ -56,7 +60,7 @@ fun ProfileScreen(
                 name = "Nguyễn Minh",
                 email = "minh@email.com",
                 plan = "Gói miễn phí",
-                onClick = { /* Open user profile detail */ }
+                onClick = onNavigateToAccount
             )
         }
 
@@ -89,7 +93,7 @@ fun ProfileScreen(
                         icon = Icons.Outlined.AccountBalanceWallet,
                         title = "Ví & tài khoản",
                         trailingText = "3",
-                        onClick = {}
+                        onClick = onNavigateToWallets
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
@@ -99,7 +103,7 @@ fun ProfileScreen(
                         icon = Icons.Outlined.Sync,
                         title = "Giao dịch định kỳ",
                         trailingText = null,
-                        onClick = {}
+                        onClick = onNavigateToRecurring
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
@@ -213,7 +217,7 @@ fun ProfileScreen(
                         icon = Icons.Outlined.FileDownload,
                         title = "Xuất Excel / CSV",
                         trailingText = null,
-                        onClick = {}
+                        onClick = onNavigateToExport
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))

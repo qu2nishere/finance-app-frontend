@@ -2,6 +2,7 @@ package com.quan.finance_app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.border
@@ -35,28 +36,80 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class BudgetNavState {
-    MAIN,
-    SAVINGS_GOALS,
-    EDIT_GOAL
+/**
+ * Các màn con mở chồng lên tab hiện tại. Tab nào cũng dùng chung một back stack,
+ * nên "Cài đặt → Danh mục → Sửa hạn mức" và "Trang chủ → Tất cả giao dịch → Chi tiết"
+ * đều lùi lại được bằng nút back.
+ */
+sealed interface Route {
+    data object Categories : Route
+    data class EditLimit(val category: String) : Route
+    data class EditIncomeCategory(val category: String) : Route
+    data object AutoSave : Route
+    data object SavingsGoals : Route
+    data object EditGoal : Route
+    data object AllTransactions : Route
+    data class TransactionDetail(val title: String) : Route
+    data object Wallets : Route
+    data object Recurring : Route
+    data object Export : Route
+    data object Notifications : Route
+    data object NotificationSettings : Route
+    data object Account : Route
 }
 
-enum class SettingsNavState {
-    MAIN,
-    CATEGORIES,
-    EDIT_LIMIT,
-    EDIT_INCOME_CATEGORY,
-    SAVINGS_GOALS,
-    EDIT_GOAL
-}
+/** Hai man truoc khi dang nhap, nam ngoai khung tab. */
+enum class AuthScreen { LOGIN, REGISTER }
 
 @Composable
 fun MainApp() {
+    var isLoggedIn by remember { mutableStateOf(false) }
+    var authScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val backStack = remember { mutableStateListOf<Route>() }
+
+    // Lớp phủ toàn màn — không nằm trong back stack vì chúng đóng bằng nút riêng
     var showAddSheet by remember { mutableStateOf(false) }
-    var budgetNavState by remember { mutableStateOf(BudgetNavState.MAIN) }
-    var settingsNavState by remember { mutableStateOf(SettingsNavState.MAIN) }
-    var editingCategory by remember { mutableStateOf("") }
+    var showScanReceipt by remember { mutableStateOf(false) }
+    var showGoalDeposit by remember { mutableStateOf(false) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
+
+    fun push(route: Route) = backStack.add(route)
+    fun pop() {
+        if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
+    }
+
+    if (!isLoggedIn) {
+        BackHandler(enabled = authScreen == AuthScreen.REGISTER) {
+            authScreen = AuthScreen.LOGIN
+        }
+        when (authScreen) {
+            AuthScreen.LOGIN -> LoginScreen(
+                onLogin = { isLoggedIn = true },
+                onGoToRegister = { authScreen = AuthScreen.REGISTER }
+            )
+            AuthScreen.REGISTER -> RegisterScreen(
+                onBack = { authScreen = AuthScreen.LOGIN },
+                onContinue = { isLoggedIn = true },
+                onGoToLogin = { authScreen = AuthScreen.LOGIN }
+            )
+        }
+        return
+    }
+
+    // Nút back của máy: đóng lớp phủ trước, sau đó mới lùi back stack
+    BackHandler(
+        enabled = backStack.isNotEmpty() || showAddSheet || showScanReceipt ||
+            showGoalDeposit || showCategoryPicker
+    ) {
+        when {
+            showCategoryPicker -> showCategoryPicker = false
+            showGoalDeposit -> showGoalDeposit = false
+            showScanReceipt -> showScanReceipt = false
+            showAddSheet -> showAddSheet = false
+            else -> pop()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -67,74 +120,94 @@ fun MainApp() {
                     selectedTab = selectedTab,
                     onTabSelected = {
                         selectedTab = it
-                        if (it != 2) {
-                            budgetNavState = BudgetNavState.MAIN
-                        }
-                        if (it != 3) {
-                            settingsNavState = SettingsNavState.MAIN
-                        }
+                        backStack.clear()
                     },
                     onAddClick = { showAddSheet = true }
                 )
             }
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                when (selectedTab) {
-                    0 -> HomeScreen()
-                    1 -> ReportScreen()
-                    2 -> {
-                        when (budgetNavState) {
-                            BudgetNavState.MAIN -> BudgetScreen(
-                                onNavigateToSavingsGoals = { budgetNavState = BudgetNavState.SAVINGS_GOALS }
-                            )
-                            BudgetNavState.SAVINGS_GOALS -> SavingsGoalsScreen(
-                                onBack = { budgetNavState = BudgetNavState.MAIN },
-                                onNavigateToEditGoal = { budgetNavState = BudgetNavState.EDIT_GOAL }
-                            )
-                            BudgetNavState.EDIT_GOAL -> EditGoalScreen(
-                                onBack = { budgetNavState = BudgetNavState.SAVINGS_GOALS }
-                            )
-                        }
+                val route = backStack.lastOrNull()
+                if (route == null) {
+                    when (selectedTab) {
+                        0 -> HomeScreen(
+                            onSeeAllTransactions = { push(Route.AllTransactions) },
+                            onScanBill = { showScanReceipt = true },
+                            onAddExpense = { showAddSheet = true },
+                            onAddIncome = { showAddSheet = true },
+                            onClassifyTransaction = { showCategoryPicker = true },
+                            onOpenTransaction = { push(Route.TransactionDetail(it)) },
+                            onOpenGoal = { push(Route.SavingsGoals) },
+                            onOpenNotifications = { push(Route.Notifications) }
+                        )
+                        1 -> ReportScreen()
+                        2 -> BudgetScreen(
+                            onNavigateToSavingsGoals = { push(Route.SavingsGoals) }
+                        )
+                        3 -> ProfileScreen(
+                            onNavigateToCategories = { push(Route.Categories) },
+                            onNavigateToSavingsGoals = { push(Route.SavingsGoals) },
+                            onNavigateToWallets = { push(Route.Wallets) },
+                            onNavigateToRecurring = { push(Route.Recurring) },
+                            onNavigateToExport = { push(Route.Export) },
+                            onNavigateToAccount = { push(Route.Account) }
+                        )
                     }
-                    3 -> {
-                        when (settingsNavState) {
-                            SettingsNavState.MAIN -> ProfileScreen(
-                                onNavigateToCategories = { settingsNavState = SettingsNavState.CATEGORIES },
-                                onNavigateToSavingsGoals = { settingsNavState = SettingsNavState.SAVINGS_GOALS }
-                            )
-                            SettingsNavState.CATEGORIES -> CategoryLimitScreen(
-                                onBack = { settingsNavState = SettingsNavState.MAIN },
-                                onEditLimit = {
-                                    editingCategory = it
-                                    settingsNavState = SettingsNavState.EDIT_LIMIT
-                                },
-                                onEditIncomeCategory = {
-                                    editingCategory = it
-                                    settingsNavState = SettingsNavState.EDIT_INCOME_CATEGORY
-                                },
-                                onViewIncomeReport = {
-                                    settingsNavState = SettingsNavState.MAIN
-                                    selectedTab = 1
-                                }
-                            )
-                            SettingsNavState.EDIT_LIMIT -> EditBudgetScreen(
-                                categoryName = editingCategory,
-                                onBack = { settingsNavState = SettingsNavState.CATEGORIES },
-                                onAddTransaction = { showAddSheet = true }
-                            )
-                            SettingsNavState.EDIT_INCOME_CATEGORY -> EditIncomeCategoryScreen(
-                                categoryName = editingCategory,
-                                onBack = { settingsNavState = SettingsNavState.CATEGORIES },
-                                onAddTransaction = { showAddSheet = true }
-                            )
-                            SettingsNavState.SAVINGS_GOALS -> SavingsGoalsScreen(
-                                onBack = { settingsNavState = SettingsNavState.MAIN },
-                                onNavigateToEditGoal = { settingsNavState = SettingsNavState.EDIT_GOAL }
-                            )
-                            SettingsNavState.EDIT_GOAL -> EditGoalScreen(
-                                onBack = { settingsNavState = SettingsNavState.SAVINGS_GOALS }
-                            )
-                        }
+                } else {
+                    when (route) {
+                        Route.Categories -> CategoryLimitScreen(
+                            onBack = { pop() },
+                            onEditLimit = { push(Route.EditLimit(it)) },
+                            onEditIncomeCategory = { push(Route.EditIncomeCategory(it)) },
+                            onViewIncomeReport = {
+                                backStack.clear()
+                                selectedTab = 1
+                            }
+                        )
+                        is Route.EditLimit -> EditBudgetScreen(
+                            categoryName = route.category,
+                            onBack = { pop() },
+                            onAddTransaction = { showAddSheet = true }
+                        )
+                        is Route.EditIncomeCategory -> EditIncomeCategoryScreen(
+                            categoryName = route.category,
+                            onBack = { pop() },
+                            onAddTransaction = { showAddSheet = true },
+                            onOpenAutoSave = { push(Route.AutoSave) }
+                        )
+                        Route.AutoSave -> AutoSaveSettingScreen(onBack = { pop() })
+                        Route.SavingsGoals -> SavingsGoalsScreen(
+                            onBack = { pop() },
+                            onNavigateToEditGoal = { push(Route.EditGoal) },
+                            onDeposit = { showGoalDeposit = true }
+                        )
+                        Route.EditGoal -> EditGoalScreen(onBack = { pop() })
+                        Route.AllTransactions -> AllTransactionsScreen(
+                            onBack = { pop() },
+                            onOpenTransaction = { push(Route.TransactionDetail(it)) }
+                        )
+                        is Route.TransactionDetail -> TransactionDetailScreen(
+                            title = route.title,
+                            onBack = { pop() },
+                            onEdit = { showAddSheet = true }
+                        )
+                        Route.Wallets -> WalletsScreen(onBack = { pop() })
+                        Route.Recurring -> RecurringTransactionsScreen(onBack = { pop() })
+                        Route.Export -> ExportDataScreen(onBack = { pop() })
+                        Route.Notifications -> NotificationsScreen(
+                            onBack = { pop() },
+                            onOpenSettings = { push(Route.NotificationSettings) }
+                        )
+                        Route.NotificationSettings -> NotificationSettingsScreen(onBack = { pop() })
+                        Route.Account -> AccountScreen(
+                            onBack = { pop() },
+                            onLogout = {
+                                backStack.clear()
+                                selectedTab = 0
+                                authScreen = AuthScreen.LOGIN
+                                isLoggedIn = false
+                            }
+                        )
                     }
                 }
             }
@@ -142,6 +215,18 @@ fun MainApp() {
 
         if (showAddSheet) {
             AddTransactionScreen(onDismissRequest = { showAddSheet = false })
+        }
+        if (showScanReceipt) {
+            ScanReceiptScreen(onDismissRequest = { showScanReceipt = false })
+        }
+        if (showGoalDeposit) {
+            GoalDepositSheet(onDismissRequest = { showGoalDeposit = false })
+        }
+        if (showCategoryPicker) {
+            CategoryPickerSheet(
+                onDismissRequest = { showCategoryPicker = false },
+                onCategorySelected = { showCategoryPicker = false }
+            )
         }
     }
 }
@@ -178,7 +263,7 @@ fun CustomBottomNav(
                 onClick = { onTabSelected(1) },
                 modifier = Modifier.weight(1f)
             )
-            
+
             // Nút Add
             Box(
                 modifier = Modifier.weight(1f),
@@ -195,7 +280,7 @@ fun CustomBottomNav(
                     Icon(Icons.Default.Add, contentDescription = "Thêm giao dịch", modifier = Modifier.size(28.dp))
                 }
             }
-            
+
             NavItem(
                 icon = Icons.Outlined.AccountBalanceWallet,
                 label = "Ngân sách",
@@ -223,7 +308,7 @@ fun NavItem(
     modifier: Modifier = Modifier
 ) {
     val color = if (isSelected) MoneyFlowTheme.colors.textBrand else MoneyFlowTheme.colors.textSecondary
-    
+
     Column(
         modifier = modifier
             .fillMaxHeight()
@@ -238,10 +323,10 @@ fun NavItem(
         Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = label, 
+            text = label,
             style = MoneyFlowTheme.typography.caption.copy(
                 fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Medium
-            ), 
+            ),
             color = color
         )
     }

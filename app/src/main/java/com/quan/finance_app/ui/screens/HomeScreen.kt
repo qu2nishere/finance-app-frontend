@@ -2,6 +2,7 @@ package com.quan.finance_app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,7 +24,17 @@ import com.quan.finance_app.ui.theme.FontMono
 import com.quan.finance_app.ui.theme.FontCore
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    onSeeAllTransactions: () -> Unit = {},
+    onScanBill: () -> Unit = {},
+    onAddExpense: () -> Unit = {},
+    onAddIncome: () -> Unit = {},
+    onClassifyTransaction: (String) -> Unit = {},
+    onOpenTransaction: (String) -> Unit = {},
+    onOpenGoal: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -33,7 +44,10 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     ) {
         // 1. Header
         item {
-            DashboardHeader()
+            DashboardHeader(
+                onOpenGoal = onOpenGoal,
+                onOpenNotifications = onOpenNotifications
+            )
         }
         
         // 2. Balance Card (Custom)
@@ -43,18 +57,29 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
         // 3. Action Buttons
         item {
-            DashboardActionButtons()
+            DashboardActionButtons(
+                onAddExpense = onAddExpense,
+                onAddIncome = onAddIncome,
+                onScanBill = onScanBill
+            )
         }
 
         // 4. Recent Transactions
         item {
-            DashboardTransactions()
+            DashboardTransactions(
+                onSeeAll = onSeeAllTransactions,
+                onOpenTransaction = onOpenTransaction,
+                onClassify = onClassifyTransaction
+            )
         }
     }
 }
 
 @Composable
-fun DashboardHeader() {
+fun DashboardHeader(
+    onOpenGoal: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {}
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -69,6 +94,7 @@ fun DashboardHeader() {
             Row(
                 modifier = Modifier
                     .background(Color.White, RoundedCornerShape(32.dp))
+                    .clickable(onClick = onOpenGoal)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -91,7 +117,7 @@ fun DashboardHeader() {
             }
             // Notification Bell
             IconButton(
-                onClick = {},
+                onClick = onOpenNotifications,
                 modifier = Modifier
                     .size(52.dp)
                     .background(Color.White, CircleShape)
@@ -178,13 +204,17 @@ fun DashboardBalanceCard() {
 }
 
 @Composable
-fun DashboardActionButtons() {
+fun DashboardActionButtons(
+    onAddExpense: () -> Unit = {},
+    onAddIncome: () -> Unit = {},
+    onScanBill: () -> Unit = {}
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Button(
-            onClick = {},
+            onClick = onAddExpense,
             modifier = Modifier.weight(1f).height(48.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MoneyFlowTheme.colors.surfaceBrand),
             shape = RoundedCornerShape(12.dp)
@@ -192,7 +222,7 @@ fun DashboardActionButtons() {
             Text("+ Chi", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontCore)
         }
         OutlinedButton(
-            onClick = {},
+            onClick = onAddIncome,
             modifier = Modifier.weight(1f).height(48.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MoneyFlowTheme.colors.surfaceBrand),
             border = BorderStroke(1.dp, MoneyFlowTheme.colors.surfaceBrand.copy(alpha = 0.3f)),
@@ -201,7 +231,7 @@ fun DashboardActionButtons() {
             Text("+ Thu", fontWeight = FontWeight.Bold, fontFamily = FontCore)
         }
         OutlinedButton(
-            onClick = {},
+            onClick = onScanBill,
             modifier = Modifier.weight(1f).height(48.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MoneyFlowTheme.colors.textSecondary),
             border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
@@ -213,7 +243,11 @@ fun DashboardActionButtons() {
 }
 
 @Composable
-fun DashboardTransactions() {
+fun DashboardTransactions(
+    onSeeAll: () -> Unit = {},
+    onOpenTransaction: (String) -> Unit = {},
+    onClassify: (String) -> Unit = {}
+) {
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -221,7 +255,14 @@ fun DashboardTransactions() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Giao dịch gần đây", style = MoneyFlowTheme.typography.title3, color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = FontCore)
-            Text("Tất cả >", style = MoneyFlowTheme.typography.body, color = MoneyFlowTheme.colors.surfaceBrand, fontWeight = FontWeight.SemiBold, fontFamily = FontCore)
+            Text(
+                "Tất cả >",
+                style = MoneyFlowTheme.typography.body,
+                color = MoneyFlowTheme.colors.surfaceBrand,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = FontCore,
+                modifier = Modifier.clickable(onClick = onSeeAll)
+            )
         }
         Spacer(modifier = Modifier.height(16.dp))
         
@@ -240,6 +281,8 @@ fun DashboardTransactions() {
                     subtitle = "Hôm nay - 09:12",
                     amount = "-72.000\u20AB",
                     amountColor = MoneyFlowTheme.colors.textPrimary,
+                    onClick = { onOpenTransaction("Highlands Coffee") },
+                    onClassify = { onClassify("Highlands Coffee") },
                     showClassify = true
                 )
                 HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(horizontal = 24.dp))
@@ -251,6 +294,7 @@ fun DashboardTransactions() {
                     subtitle = "Hôm nay - 08:05 - Di chuyển",
                     amount = "-45.000\u20AB",
                     amountColor = MoneyFlowTheme.colors.textPrimary,
+                    onClick = { onOpenTransaction("Grab - đi làm") },
                     showClassify = false
                 )
                 HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(horizontal = 24.dp))
@@ -262,6 +306,7 @@ fun DashboardTransactions() {
                     subtitle = "20/08 - Thu nhập",
                     amount = "+18.000.000\u20AB",
                     amountColor = Color(0xFF4CAF50),
+                    onClick = { onOpenTransaction("Lương tháng 8") },
                     showClassify = false
                 )
                 HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(horizontal = 24.dp))
@@ -273,6 +318,8 @@ fun DashboardTransactions() {
                     subtitle = "19/08 - 19:44",
                     amount = "-318.000\u20AB",
                     amountColor = MoneyFlowTheme.colors.textPrimary,
+                    onClick = { onOpenTransaction("VinMart") },
+                    onClassify = { onClassify("VinMart") },
                     showClassify = true
                 )
             }
@@ -289,11 +336,14 @@ fun TransactionItem(
     subtitle: String,
     amount: String,
     amountColor: Color,
-    showClassify: Boolean
+    showClassify: Boolean,
+    onClick: () -> Unit = {},
+    onClassify: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -318,6 +368,7 @@ fun TransactionItem(
                 Row(
                     modifier = Modifier
                         .background(Color(0xFFE3EDFF), RoundedCornerShape(12.dp))
+                        .clickable(onClick = onClassify)
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text("Phân loại >", color = MoneyFlowTheme.colors.surfaceBrand, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontCore)

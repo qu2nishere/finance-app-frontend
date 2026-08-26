@@ -30,6 +30,7 @@ import com.quan.finance_app.ui.theme.*
 fun SavingsGoalsScreen(
     onBack: () -> Unit = {},
     onNavigateToEditGoal: () -> Unit = {},
+    onDeposit: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -115,7 +116,8 @@ fun SavingsGoalsScreen(
                     subInfo = "Cần 1,4tr/tháng · hạn 12/2026",
                     progress = 0.45f,
                     progressColor = Grow500,
-                    onClick = onNavigateToEditGoal
+                    onClick = onNavigateToEditGoal,
+                    onDeposit = onDeposit
                 )
 
                 // Goal 2: Quỹ dự phòng (22%)
@@ -129,7 +131,8 @@ fun SavingsGoalsScreen(
                     subInfo = "Tự trích 3,6tr/tháng · hạn 06/2027",
                     progress = 0.22f,
                     progressColor = Grow500,
-                    onClick = onNavigateToEditGoal
+                    onClick = onNavigateToEditGoal,
+                    onDeposit = onDeposit
                 )
 
                 // Goal 3: Đổi điện thoại (25% - Chậm tiến độ)
@@ -144,7 +147,8 @@ fun SavingsGoalsScreen(
                     subInfoColor = Heat500,
                     progress = 0.25f,
                     progressColor = Sun500,
-                    onClick = onNavigateToEditGoal
+                    onClick = onNavigateToEditGoal,
+                    onDeposit = onDeposit
                 )
             }
         }
@@ -320,7 +324,8 @@ fun ActiveGoalCard(
     subInfoColor: Color = MoneyFlowTheme.colors.textSecondary,
     progress: Float,
     progressColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeposit: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -410,7 +415,9 @@ fun ActiveGoalCard(
 
             // Plus Action Button
             Surface(
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(onClick = onDeposit),
                 shape = RoundedCornerShape(10.dp),
                 color = Color(0xFFFFF0EC)
             ) {
