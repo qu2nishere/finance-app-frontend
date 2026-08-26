@@ -41,11 +41,22 @@ enum class BudgetNavState {
     EDIT_GOAL
 }
 
+enum class SettingsNavState {
+    MAIN,
+    CATEGORIES,
+    EDIT_LIMIT,
+    EDIT_INCOME_CATEGORY,
+    SAVINGS_GOALS,
+    EDIT_GOAL
+}
+
 @Composable
 fun MainApp() {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddSheet by remember { mutableStateOf(false) }
     var budgetNavState by remember { mutableStateOf(BudgetNavState.MAIN) }
+    var settingsNavState by remember { mutableStateOf(SettingsNavState.MAIN) }
+    var editingCategory by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -54,10 +65,13 @@ fun MainApp() {
             bottomBar = {
                 CustomBottomNav(
                     selectedTab = selectedTab,
-                    onTabSelected = { 
+                    onTabSelected = {
                         selectedTab = it
                         if (it != 2) {
                             budgetNavState = BudgetNavState.MAIN
+                        }
+                        if (it != 3) {
+                            settingsNavState = SettingsNavState.MAIN
                         }
                     },
                     onAddClick = { showAddSheet = true }
@@ -82,7 +96,46 @@ fun MainApp() {
                             )
                         }
                     }
-                    3 -> ProfileScreen()
+                    3 -> {
+                        when (settingsNavState) {
+                            SettingsNavState.MAIN -> ProfileScreen(
+                                onNavigateToCategories = { settingsNavState = SettingsNavState.CATEGORIES },
+                                onNavigateToSavingsGoals = { settingsNavState = SettingsNavState.SAVINGS_GOALS }
+                            )
+                            SettingsNavState.CATEGORIES -> CategoryLimitScreen(
+                                onBack = { settingsNavState = SettingsNavState.MAIN },
+                                onEditLimit = {
+                                    editingCategory = it
+                                    settingsNavState = SettingsNavState.EDIT_LIMIT
+                                },
+                                onEditIncomeCategory = {
+                                    editingCategory = it
+                                    settingsNavState = SettingsNavState.EDIT_INCOME_CATEGORY
+                                },
+                                onViewIncomeReport = {
+                                    settingsNavState = SettingsNavState.MAIN
+                                    selectedTab = 1
+                                }
+                            )
+                            SettingsNavState.EDIT_LIMIT -> EditBudgetScreen(
+                                categoryName = editingCategory,
+                                onBack = { settingsNavState = SettingsNavState.CATEGORIES },
+                                onAddTransaction = { showAddSheet = true }
+                            )
+                            SettingsNavState.EDIT_INCOME_CATEGORY -> EditIncomeCategoryScreen(
+                                categoryName = editingCategory,
+                                onBack = { settingsNavState = SettingsNavState.CATEGORIES },
+                                onAddTransaction = { showAddSheet = true }
+                            )
+                            SettingsNavState.SAVINGS_GOALS -> SavingsGoalsScreen(
+                                onBack = { settingsNavState = SettingsNavState.MAIN },
+                                onNavigateToEditGoal = { settingsNavState = SettingsNavState.EDIT_GOAL }
+                            )
+                            SettingsNavState.EDIT_GOAL -> EditGoalScreen(
+                                onBack = { settingsNavState = SettingsNavState.SAVINGS_GOALS }
+                            )
+                        }
+                    }
                 }
             }
         }

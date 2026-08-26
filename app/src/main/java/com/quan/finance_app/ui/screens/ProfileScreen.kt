@@ -22,7 +22,11 @@ import androidx.compose.ui.unit.sp
 import com.quan.finance_app.ui.theme.*
 
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
+fun ProfileScreen(
+    onNavigateToCategories: () -> Unit = {},
+    onNavigateToSavingsGoals: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     var isDailyReminderEnabled by remember { mutableStateOf(true) }
     var isBudgetAlertEnabled by remember { mutableStateOf(true) }
     var isDarkModeEnabled by remember { mutableStateOf(false) }
@@ -75,7 +79,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                         icon = Icons.Outlined.GridView,
                         title = "Danh mục và Hạn mức",
                         trailingText = "14 · 5 hạn mức",
-                        onClick = {}
+                        onClick = onNavigateToCategories
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
@@ -105,7 +109,7 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                         icon = Icons.Outlined.Savings,
                         title = "Mục tiêu tiết kiệm",
                         trailingText = "3 đang chạy",
-                        onClick = {}
+                        onClick = onNavigateToSavingsGoals
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
