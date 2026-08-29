@@ -28,6 +28,7 @@ import com.quan.finance_app.ui.theme.*
 @Composable
 fun AccountScreen(
     onBack: () -> Unit = {},
+    onOpenSecurity: () -> Unit = {},
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -183,7 +184,7 @@ fun AccountScreen(
                     iconSize = 30.dp,
                     subtitle = "Đổi lần cuối 3 tháng trước",
                     showChevron = true,
-                    onClick = { }
+                    onClick = onOpenSecurity
                 )
                 HorizontalDivider(color = MoneyFlowTheme.colors.borderSubtle)
                 MfToggleRow(
@@ -198,7 +199,7 @@ fun AccountScreen(
                     icon = Icons.Outlined.Computer,
                     iconSize = 30.dp,
                     showChevron = true,
-                    onClick = { },
+                    onClick = onOpenSecurity,
                     trailing = {
                         Text(
                             text = "2",

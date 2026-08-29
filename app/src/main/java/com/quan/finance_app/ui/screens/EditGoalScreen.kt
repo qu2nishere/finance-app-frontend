@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quan.finance_app.ui.components.core.*
 import com.quan.finance_app.ui.theme.*
 
 @Composable
@@ -34,6 +35,8 @@ fun EditGoalScreen(
     var targetDate by remember { mutableStateOf("31/12/2026") }
     var selectedColorIndex by remember { mutableIntStateOf(0) }
     var isAutoDeductEnabled by remember { mutableStateOf(true) }
+    // turn 10: số tiền trích mỗi tháng sửa được ngay tại hàng
+    var autoDeductAmount by remember { mutableLongStateOf(1_400_000L) }
     var isShowOnHomeEnabled by remember { mutableStateOf(true) }
     var isReminderEnabled by remember { mutableStateOf(true) }
 
@@ -290,9 +293,16 @@ fun EditGoalScreen(
                     SettingToggleRow(
                         icon = Icons.Outlined.Sync,
                         title = "Tự trích mỗi tháng",
-                        subtitle = "Ngày 25 · 1.400.000₫",
+                        subtitle = "Ngày 25 · sửa số tiền hoặc %",
                         isChecked = isAutoDeductEnabled,
-                        onCheckedChange = { isAutoDeductEnabled = it }
+                        onCheckedChange = { isAutoDeductEnabled = it },
+                        trailing = {
+                            MfEditableChip(
+                                value = formatVnd(autoDeductAmount),
+                                accent = Grow600,
+                                onClick = { autoDeductAmount += 100_000L }
+                            )
+                        }
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
@@ -548,7 +558,8 @@ fun SettingToggleRow(
     title: String,
     subtitle: String?,
     isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -588,6 +599,12 @@ fun SettingToggleRow(
                     )
                 }
             }
+        }
+
+        if (trailing != null) {
+            Spacer(modifier = Modifier.width(10.dp))
+            trailing()
+            Spacer(modifier = Modifier.width(8.dp))
         }
 
         Switch(

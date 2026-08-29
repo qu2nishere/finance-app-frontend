@@ -39,6 +39,7 @@ import com.quan.finance_app.ui.theme.*
 fun LoginScreen(
     onLogin: () -> Unit = {},
     onGoToRegister: () -> Unit = {},
+    onForgotPassword: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var email by remember { mutableStateOf("minh@email.com") }
@@ -151,7 +152,7 @@ fun LoginScreen(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Blue600,
-                    modifier = Modifier.clickable { }
+                    modifier = Modifier.clickable(onClick = onForgotPassword)
                 )
             }
 

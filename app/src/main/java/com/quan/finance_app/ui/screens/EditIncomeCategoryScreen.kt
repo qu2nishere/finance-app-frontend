@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quan.finance_app.ui.components.core.*
 import com.quan.finance_app.ui.theme.*
 
 /**
@@ -49,6 +50,9 @@ fun EditIncomeCategoryScreen(
     var monthlyExpectedEnabled by remember { mutableStateOf(true) }
     var lateReminderEnabled by remember { mutableStateOf(true) }
     var autoSaveEnabled by remember { mutableStateOf(true) }
+    // turn 10: số tiền dự kiến và % trích đều sửa được ngay tại hàng
+    var expectedAmount by remember { mutableLongStateOf(18_000_000L) }
+    var autoSavePercent by remember { mutableIntStateOf(20) }
 
     LazyColumn(
         modifier = modifier
@@ -307,9 +311,16 @@ fun EditIncomeCategoryScreen(
                     IncomeToggleRow(
                         icon = Icons.Outlined.Sync,
                         title = "Dự kiến nhận hằng tháng",
-                        subtitle = "Ngày 20 · 18.000.000₫",
+                        subtitle = "Ngày 20 · sửa số tiền",
                         checked = monthlyExpectedEnabled,
-                        onCheckedChange = { monthlyExpectedEnabled = it }
+                        onCheckedChange = { monthlyExpectedEnabled = it },
+                        trailing = {
+                            MfEditableChip(
+                                value = formatVnd(expectedAmount),
+                                accent = Grow600,
+                                onClick = { expectedAmount += 1_000_000L }
+                            )
+                        }
                     )
 
                     HorizontalDivider(color = MoneyFlowTheme.colors.borderSubtle)
@@ -327,10 +338,19 @@ fun EditIncomeCategoryScreen(
                     IncomeToggleRow(
                         icon = Icons.Outlined.Savings,
                         title = "Tự trích vào mục tiêu",
-                        subtitle = "20% → Quỹ dự phòng",
+                        subtitle = "$autoSavePercent% → Quỹ dự phòng · sửa %",
                         checked = autoSaveEnabled,
                         onCheckedChange = { autoSaveEnabled = it },
-                        onClick = onOpenAutoSave
+                        onClick = onOpenAutoSave,
+                        trailing = {
+                            MfEditableChip(
+                                value = "$autoSavePercent%",
+                                accent = Grow600,
+                                onClick = {
+                                    autoSavePercent = if (autoSavePercent >= 50) 5 else autoSavePercent + 5
+                                }
+                            )
+                        }
                     )
                 }
             }
@@ -523,7 +543,8 @@ private fun IncomeToggleRow(
     subtitle: String?,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -549,6 +570,11 @@ private fun IncomeToggleRow(
                     color = MoneyFlowTheme.colors.textSecondary
                 )
             }
+        }
+        if (trailing != null) {
+            Spacer(modifier = Modifier.width(10.dp))
+            trailing()
+            Spacer(modifier = Modifier.width(8.dp))
         }
         Switch(
             checked = checked,

@@ -29,10 +29,13 @@ fun ProfileScreen(
     onNavigateToRecurring: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
+    onNavigateToCurrency: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
+    onDeleteAllData: () -> Unit = {},
+    onNavigateToAutoSave: () -> Unit = {},
+    onNavigateToNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var isDailyReminderEnabled by remember { mutableStateOf(true) }
-    var isBudgetAlertEnabled by remember { mutableStateOf(true) }
     var isDarkModeEnabled by remember { mutableStateOf(false) }
     var isBiometricLockEnabled by remember { mutableStateOf(true) }
 
@@ -59,7 +62,6 @@ fun ProfileScreen(
             UserProfileCard(
                 name = "Nguyễn Minh",
                 email = "minh@email.com",
-                plan = "Gói miễn phí",
                 onClick = onNavigateToAccount
             )
         }
@@ -118,12 +120,24 @@ fun ProfileScreen(
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
 
+                    // Tự trích thu nhập
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.Percent,
+                        title = "Tự trích thu nhập",
+                        subtitle = "20% → Quỹ dự phòng",
+                        trailingText = "20%",
+                        trailingTextColor = Grow600,
+                        onClick = onNavigateToAutoSave
+                    )
+
+                    HorizontalDivider(color = Color(0xFFF4F6F9))
+
                     // Đơn vị tiền tệ
                     SettingNavigationRow(
                         icon = Icons.Outlined.Payments,
                         title = "Đơn vị tiền tệ",
                         trailingText = "VND ₫",
-                        onClick = {}
+                        onClick = onNavigateToCurrency
                     )
                 }
             }
@@ -143,24 +157,13 @@ fun ProfileScreen(
                 border = BorderStroke(1.dp, Color(0xFFF0F3F8))
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    // Nhắc nhập chi tiêu hằng ngày
-                    SettingToggleItem(
+                    // Thông báo & nhắc nhở — gom mọi loại thông báo vào màn riêng (9e)
+                    SettingNavigationRow(
                         icon = Icons.Outlined.Notifications,
-                        title = "Nhắc nhập chi tiêu hằng ngày",
-                        subtitle = "21:00",
-                        isChecked = isDailyReminderEnabled,
-                        onCheckedChange = { isDailyReminderEnabled = it }
-                    )
-
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
-
-                    // Cảnh báo vượt ngân sách
-                    SettingToggleItem(
-                        icon = Icons.Outlined.WarningAmber,
-                        title = "Cảnh báo vượt ngân sách",
-                        subtitle = null,
-                        isChecked = isBudgetAlertEnabled,
-                        onCheckedChange = { isBudgetAlertEnabled = it }
+                        title = "Thông báo & nhắc nhở",
+                        subtitle = "Nhắc ghi chi tiêu 21:00 · 8 loại bật",
+                        trailingText = "8 bật",
+                        onClick = onNavigateToNotificationSettings
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
@@ -228,7 +231,7 @@ fun ProfileScreen(
                         title = "Sao lưu & đồng bộ",
                         trailingText = "Hôm nay",
                         trailingTextColor = Grow500,
-                        onClick = {}
+                        onClick = onNavigateToBackup
                     )
 
                     HorizontalDivider(color = Color(0xFFF4F6F9))
@@ -241,7 +244,7 @@ fun ProfileScreen(
                         title = "Xoá toàn bộ dữ liệu",
                         titleColor = Alert500,
                         trailingText = null,
-                        onClick = {}
+                        onClick = onDeleteAllData
                     )
                 }
             }
@@ -269,7 +272,6 @@ fun SectionHeader(title: String) {
 fun UserProfileCard(
     name: String,
     email: String,
-    plan: String,
     onClick: () -> Unit
 ) {
     Surface(
@@ -312,7 +314,7 @@ fun UserProfileCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "$email · $plan",
+                    text = email,
                     fontFamily = FontCore,
                     fontSize = 12.sp,
                     color = MoneyFlowTheme.colors.textSecondary
@@ -335,6 +337,7 @@ fun SettingNavigationRow(
     iconBg: Color = Color(0xFFEEF4FF),
     iconTint: Color = Blue500,
     title: String,
+    subtitle: String? = null,
     titleColor: Color = MoneyFlowTheme.colors.textPrimary,
     trailingText: String? = null,
     trailingTextColor: Color = MoneyFlowTheme.colors.textSecondary,
@@ -363,13 +366,24 @@ fun SettingNavigationRow(
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = title,
-                fontFamily = FontCore,
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-                color = titleColor
-            )
+            Column {
+                Text(
+                    text = title,
+                    fontFamily = FontCore,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    color = titleColor
+                )
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        fontFamily = FontCore,
+                        fontSize = 12.sp,
+                        color = MoneyFlowTheme.colors.textSecondary
+                    )
+                }
+            }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {

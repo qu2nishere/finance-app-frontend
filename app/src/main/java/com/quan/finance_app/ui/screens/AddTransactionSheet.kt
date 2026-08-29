@@ -45,9 +45,13 @@ import java.util.Locale
 @Composable
 fun AddTransactionScreen(
     onDismissRequest: () -> Unit,
+    onOpenAutoSave: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isExpense by remember { mutableStateOf(true) }
+    // 4b: mức trích cho chính khoản thu này — sửa tại chỗ bằng "Đổi %"
+    var autoSaveEnabled by remember { mutableStateOf(true) }
+    var autoSavePercent by remember { mutableIntStateOf(20) }
     var expression by remember { mutableStateOf("") }
     var showCalculator by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -361,28 +365,17 @@ fun AddTransactionScreen(
             
             if (!isExpense) {
                 Spacer(modifier = Modifier.height(16.dp))
-                // Switch Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .height(56.dp)
-                        .background(Color.White, RoundedCornerShape(16.dp))
-                        .border(1.dp, MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(16.dp))
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Tự trích 20% vào \"Quỹ dự phòng\"", style = MoneyFlowTheme.typography.body, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontCore)
-                    Switch(
-                        checked = true, 
-                        onCheckedChange = { },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = MoneyFlowTheme.colors.flowIn
-                        )
-                    )
-                }
+                AutoSaveIncomeCard(
+                    enabled = autoSaveEnabled,
+                    onEnabledChange = { autoSaveEnabled = it },
+                    percent = autoSavePercent,
+                    incomeAmount = calculatedAmount,
+                    onChangePercent = {
+                        autoSavePercent = if (autoSavePercent >= 50) 5 else autoSavePercent + 5
+                    },
+                    onOpenSettings = onOpenAutoSave,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))

@@ -27,7 +27,7 @@ private data class RecurringItem(
 )
 
 private val upcomingItems = listOf(
-    RecurringItem("Tiền nhà", "Ngày 25 · còn 3 ngày", -2_000_000L, Icons.AutoMirrored.Outlined.ReceiptLong, isDueSoon = true),
+    RecurringItem("Tiền nhà", "Ngày 25 · 3 ngày nữa", -2_000_000L, Icons.AutoMirrored.Outlined.ReceiptLong, isDueSoon = true),
     RecurringItem("Gói data 4G", "Ngày 28 · còn 6 ngày", -120_000L, Icons.Outlined.Smartphone),
     RecurringItem("Lương", "Ngày 20 · đã nhận", 18_000_000L, Icons.Outlined.Payments, isIncome = true)
 )

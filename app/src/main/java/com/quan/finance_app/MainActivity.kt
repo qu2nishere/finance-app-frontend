@@ -56,10 +56,15 @@ sealed interface Route {
     data object Notifications : Route
     data object NotificationSettings : Route
     data object Account : Route
+    data object Security : Route
+    data object Currency : Route
+    data object Backup : Route
+    data object AddWallet : Route
+    data object AdjustBalance : Route
 }
 
 /** Hai man truoc khi dang nhap, nam ngoai khung tab. */
-enum class AuthScreen { LOGIN, REGISTER }
+enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
 
 @Composable
 fun MainApp() {
@@ -73,6 +78,7 @@ fun MainApp() {
     var showScanReceipt by remember { mutableStateOf(false) }
     var showGoalDeposit by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showDeleteData by remember { mutableStateOf(false) }
 
     fun push(route: Route) = backStack.add(route)
     fun pop() {
@@ -80,18 +86,37 @@ fun MainApp() {
     }
 
     if (!isLoggedIn) {
-        BackHandler(enabled = authScreen == AuthScreen.REGISTER) {
-            authScreen = AuthScreen.LOGIN
+        BackHandler(enabled = authScreen != AuthScreen.LOGIN) {
+            authScreen = when (authScreen) {
+                AuthScreen.REGISTER_3 -> AuthScreen.REGISTER_2
+                AuthScreen.REGISTER_2 -> AuthScreen.REGISTER
+                else -> AuthScreen.LOGIN
+            }
         }
         when (authScreen) {
             AuthScreen.LOGIN -> LoginScreen(
                 onLogin = { isLoggedIn = true },
-                onGoToRegister = { authScreen = AuthScreen.REGISTER }
+                onGoToRegister = { authScreen = AuthScreen.REGISTER },
+                onForgotPassword = { authScreen = AuthScreen.VERIFY_EMAIL }
+            )
+            AuthScreen.VERIFY_EMAIL -> VerifyEmailScreen(
+                onBack = { authScreen = AuthScreen.LOGIN },
+                onVerified = { isLoggedIn = true }
             )
             AuthScreen.REGISTER -> RegisterScreen(
                 onBack = { authScreen = AuthScreen.LOGIN },
-                onContinue = { isLoggedIn = true },
+                onContinue = { authScreen = AuthScreen.REGISTER_2 },
                 onGoToLogin = { authScreen = AuthScreen.LOGIN }
+            )
+            AuthScreen.REGISTER_2 -> RegisterStep2Screen(
+                onBack = { authScreen = AuthScreen.REGISTER },
+                onContinue = { authScreen = AuthScreen.REGISTER_3 },
+                onSkip = { isLoggedIn = true }
+            )
+            AuthScreen.REGISTER_3 -> RegisterStep3Screen(
+                onBack = { authScreen = AuthScreen.REGISTER_2 },
+                onFinish = { isLoggedIn = true },
+                onSkip = { isLoggedIn = true }
             )
         }
         return
@@ -100,9 +125,10 @@ fun MainApp() {
     // Nút back của máy: đóng lớp phủ trước, sau đó mới lùi back stack
     BackHandler(
         enabled = backStack.isNotEmpty() || showAddSheet || showScanReceipt ||
-            showGoalDeposit || showCategoryPicker
+            showGoalDeposit || showCategoryPicker || showDeleteData
     ) {
         when {
+            showDeleteData -> showDeleteData = false
             showCategoryPicker -> showCategoryPicker = false
             showGoalDeposit -> showGoalDeposit = false
             showScanReceipt -> showScanReceipt = false
@@ -150,7 +176,12 @@ fun MainApp() {
                             onNavigateToWallets = { push(Route.Wallets) },
                             onNavigateToRecurring = { push(Route.Recurring) },
                             onNavigateToExport = { push(Route.Export) },
-                            onNavigateToAccount = { push(Route.Account) }
+                            onNavigateToAccount = { push(Route.Account) },
+                            onNavigateToCurrency = { push(Route.Currency) },
+                            onNavigateToBackup = { push(Route.Backup) },
+                            onDeleteAllData = { showDeleteData = true },
+                            onNavigateToAutoSave = { push(Route.AutoSave) },
+                            onNavigateToNotificationSettings = { push(Route.NotificationSettings) }
                         )
                     }
                 } else {
@@ -191,7 +222,11 @@ fun MainApp() {
                             onBack = { pop() },
                             onEdit = { showAddSheet = true }
                         )
-                        Route.Wallets -> WalletsScreen(onBack = { pop() })
+                        Route.Wallets -> WalletsScreen(
+                            onBack = { pop() },
+                            onAddWallet = { push(Route.AddWallet) },
+                            onAdjustBalance = { push(Route.AdjustBalance) }
+                        )
                         Route.Recurring -> RecurringTransactionsScreen(onBack = { pop() })
                         Route.Export -> ExportDataScreen(onBack = { pop() })
                         Route.Notifications -> NotificationsScreen(
@@ -199,8 +234,14 @@ fun MainApp() {
                             onOpenSettings = { push(Route.NotificationSettings) }
                         )
                         Route.NotificationSettings -> NotificationSettingsScreen(onBack = { pop() })
+                        Route.Security -> SecurityScreen(onBack = { pop() })
+                        Route.Currency -> CurrencySettingsScreen(onBack = { pop() })
+                        Route.Backup -> BackupSyncScreen(onBack = { pop() })
+                        Route.AddWallet -> AddWalletScreen(onBack = { pop() })
+                        Route.AdjustBalance -> AdjustBalanceScreen(onBack = { pop() })
                         Route.Account -> AccountScreen(
                             onBack = { pop() },
+                            onOpenSecurity = { push(Route.Security) },
                             onLogout = {
                                 backStack.clear()
                                 selectedTab = 0
@@ -214,13 +255,25 @@ fun MainApp() {
         }
 
         if (showAddSheet) {
-            AddTransactionScreen(onDismissRequest = { showAddSheet = false })
+            AddTransactionScreen(
+                onDismissRequest = { showAddSheet = false },
+                onOpenAutoSave = {
+                    showAddSheet = false
+                    push(Route.AutoSave)
+                }
+            )
         }
         if (showScanReceipt) {
             ScanReceiptScreen(onDismissRequest = { showScanReceipt = false })
         }
         if (showGoalDeposit) {
             GoalDepositSheet(onDismissRequest = { showGoalDeposit = false })
+        }
+        if (showDeleteData) {
+            DeleteDataDialog(
+                onDismissRequest = { showDeleteData = false },
+                onConfirm = { showDeleteData = false }
+            )
         }
         if (showCategoryPicker) {
             CategoryPickerSheet(

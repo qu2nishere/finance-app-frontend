@@ -44,6 +44,8 @@ private val excludedWallets = listOf(
 @Composable
 fun WalletsScreen(
     onBack: () -> Unit = {},
+    onAddWallet: () -> Unit = {},
+    onAdjustBalance: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -132,7 +134,7 @@ fun WalletsScreen(
                     icon = Icons.AutoMirrored.Outlined.ArrowForward,
                     subtitle = "Khi số dư trong app lệch với thực tế",
                     showChevron = true,
-                    onClick = { }
+                    onClick = onAdjustBalance
                 )
             }
         }
@@ -142,7 +144,7 @@ fun WalletsScreen(
                 text = "Thêm ví hoặc liên kết ngân hàng",
                 color = Blue600,
                 borderColor = Blue200,
-                onClick = { }
+                onClick = onAddWallet
             )
         }
     }
