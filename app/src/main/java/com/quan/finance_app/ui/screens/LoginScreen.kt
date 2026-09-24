@@ -37,13 +37,16 @@ import com.quan.finance_app.ui.theme.*
  */
 @Composable
 fun LoginScreen(
-    onLogin: () -> Unit = {},
+    onLogin: (email: String, password: String) -> Unit = { _, _ -> },
     onGoToRegister: () -> Unit = {},
     onForgotPassword: () -> Unit = {},
+    loading: Boolean = false,
+    errorMessage: String? = null,
+    fieldErrors: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
-    var email by remember { mutableStateOf("minh@email.com") }
-    var password by remember { mutableStateOf("12345678") }
+    var email by remember { mutableStateOf("quan@gmail.com") }
+    var password by remember { mutableStateOf("matkhau123") }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(true) }
 
@@ -156,7 +159,22 @@ fun LoginScreen(
                 )
             }
 
-            AuthPrimaryButton(text = "Đăng nhập", onClick = onLogin)
+            // Lỗi từ backend: 401 sai mật khẩu, 423 khoá tài khoản, 400 sai định dạng...
+            val problem = errorMessage ?: fieldErrors.values.joinToString("\n").ifBlank { null }
+            if (problem != null) {
+                Text(
+                    text = problem,
+                    fontFamily = FontCore,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = MoneyFlowTheme.colors.stateDanger
+                )
+            }
+
+            AuthPrimaryButton(
+                text = if (loading) "Đang đăng nhập…" else "Đăng nhập",
+                onClick = { if (!loading) onLogin(email, password) }
+            )
 
             // Face ID
             MfCard {
@@ -165,7 +183,7 @@ fun LoginScreen(
                     icon = Icons.Outlined.Face,
                     iconSize = 30.dp,
                     showChevron = true,
-                    onClick = onLogin
+                    onClick = { if (!loading) onLogin(email, password) }
                 )
             }
 
@@ -193,13 +211,13 @@ fun LoginScreen(
                     label = "Google",
                     icon = Icons.Outlined.Language,
                     modifier = Modifier.weight(1f),
-                    onClick = onLogin
+                    onClick = { if (!loading) onLogin(email, password) }
                 )
                 SocialButton(
                     label = "Apple",
                     icon = Icons.Outlined.PhoneIphone,
                     modifier = Modifier.weight(1f),
-                    onClick = onLogin
+                    onClick = { if (!loading) onLogin(email, password) }
                 )
             }
 

@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.ui.auth.AuthViewModel
 import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
@@ -67,9 +69,19 @@ sealed interface Route {
 enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
 
 @Composable
-fun MainApp() {
+fun MainApp(authViewModel: AuthViewModel = viewModel()) {
+    val auth by authViewModel.state.collectAsState()
+
     var isLoggedIn by remember { mutableStateOf(false) }
     var authScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
+
+    // Gọi API xong thì mới điều hướng. consumeNavigation() tắt cờ để không chạy lại.
+    LaunchedEffect(auth.loginSuccess, auth.registerSuccess) {
+        when {
+            auth.loginSuccess -> { isLoggedIn = true; authViewModel.consumeNavigation() }
+            auth.registerSuccess -> { authScreen = AuthScreen.REGISTER_2; authViewModel.consumeNavigation() }
+        }
+    }
     var selectedTab by remember { mutableIntStateOf(0) }
     val backStack = remember { mutableStateListOf<Route>() }
 
@@ -95,18 +107,26 @@ fun MainApp() {
         }
         when (authScreen) {
             AuthScreen.LOGIN -> LoginScreen(
-                onLogin = { isLoggedIn = true },
-                onGoToRegister = { authScreen = AuthScreen.REGISTER },
-                onForgotPassword = { authScreen = AuthScreen.VERIFY_EMAIL }
+                onLogin = { email, password -> authViewModel.login(email, password) },
+                onGoToRegister = { authViewModel.clearErrors(); authScreen = AuthScreen.REGISTER },
+                onForgotPassword = { authScreen = AuthScreen.VERIFY_EMAIL },
+                loading = auth.loading,
+                errorMessage = auth.errorMessage,
+                fieldErrors = auth.fieldErrors
             )
             AuthScreen.VERIFY_EMAIL -> VerifyEmailScreen(
                 onBack = { authScreen = AuthScreen.LOGIN },
                 onVerified = { isLoggedIn = true }
             )
             AuthScreen.REGISTER -> RegisterScreen(
-                onBack = { authScreen = AuthScreen.LOGIN },
-                onContinue = { authScreen = AuthScreen.REGISTER_2 },
-                onGoToLogin = { authScreen = AuthScreen.LOGIN }
+                onBack = { authViewModel.clearErrors(); authScreen = AuthScreen.LOGIN },
+                onContinue = { fullName, email, password ->
+                    authViewModel.register(email, password, fullName)
+                },
+                onGoToLogin = { authViewModel.clearErrors(); authScreen = AuthScreen.LOGIN },
+                loading = auth.loading,
+                errorMessage = auth.errorMessage,
+                fieldErrors = auth.fieldErrors
             )
             AuthScreen.REGISTER_2 -> RegisterStep2Screen(
                 onBack = { authScreen = AuthScreen.REGISTER },

@@ -27,8 +27,11 @@ import com.quan.finance_app.ui.theme.*
 @Composable
 fun RegisterScreen(
     onBack: () -> Unit = {},
-    onContinue: () -> Unit = {},
+    onContinue: (fullName: String, email: String, password: String) -> Unit = { _, _, _ -> },
     onGoToLogin: () -> Unit = {},
+    loading: Boolean = false,
+    errorMessage: String? = null,
+    fieldErrors: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf("Nguyễn Minh") }
@@ -78,7 +81,7 @@ fun RegisterScreen(
                 fontFamily = FontCore,
                 fontSize = 14.sp,
                 color = MoneyFlowTheme.colors.textSecondary,
-                modifier = Modifier.clickable(onClick = onContinue)
+                modifier = Modifier.clickable { if (!loading) onContinue(name, email, password) }
             )
         }
 
@@ -208,7 +211,22 @@ fun RegisterScreen(
                 }
             }
 
-            AuthPrimaryButton(text = "Tiếp tục", onClick = onContinue)
+            // Lỗi từ backend: 409 email trùng, 400 mật khẩu quá ngắn / email sai định dạng...
+            val problem = errorMessage ?: fieldErrors.values.joinToString("\n").ifBlank { null }
+            if (problem != null) {
+                Text(
+                    text = problem,
+                    fontFamily = FontCore,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = MoneyFlowTheme.colors.stateDanger
+                )
+            }
+
+            AuthPrimaryButton(
+                text = if (loading) "Đang tạo tài khoản…" else "Tiếp tục",
+                onClick = { if (!loading) onContinue(name, email, password) }
+            )
 
             MfInfoBanner(
                 text = "Bước sau: chọn danh mục thường dùng và đặt hạn mức đầu tiên — bỏ qua được, sửa sau trong Cài đặt.",
