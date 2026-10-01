@@ -54,6 +54,11 @@ dependencies {
     implementation(libs.okhttp.logging)
     // viewModel() dùng được trong @Composable
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    // Credential Manager chính thức từ Google (Google Sign-In)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

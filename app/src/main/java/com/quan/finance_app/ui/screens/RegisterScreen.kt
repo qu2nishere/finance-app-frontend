@@ -28,6 +28,7 @@ import com.quan.finance_app.ui.theme.*
 fun RegisterScreen(
     onBack: () -> Unit = {},
     onContinue: (fullName: String, email: String, password: String) -> Unit = { _, _, _ -> },
+    onGoogleLogin: () -> Unit = {},
     onGoToLogin: () -> Unit = {},
     loading: Boolean = false,
     errorMessage: String? = null,
@@ -227,6 +228,40 @@ fun RegisterScreen(
                 text = if (loading) "Đang tạo tài khoản…" else "Tiếp tục",
                 onClick = { if (!loading) onContinue(name, email, password) }
             )
+
+            // hoặc
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MoneyFlowTheme.colors.borderSubtle
+                )
+                Text(
+                    text = "hoặc",
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    fontFamily = FontCore,
+                    fontSize = 11.sp,
+                    color = MoneyFlowTheme.colors.textTertiary
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MoneyFlowTheme.colors.borderSubtle
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SocialButton(
+                    label = "Google",
+                    iconRes = com.quan.finance_app.R.drawable.ic_google,
+                    modifier = Modifier.weight(1f),
+                    onClick = { if (!loading) onGoogleLogin() }
+                )
+                SocialButton(
+                    label = "Apple",
+                    icon = Icons.Outlined.PhoneIphone,
+                    modifier = Modifier.weight(1f),
+                    onClick = { }
+                )
+            }
 
             MfInfoBanner(
                 text = "Bước sau: chọn danh mục thường dùng và đặt hạn mức đầu tiên — bỏ qua được, sửa sau trong Cài đặt.",

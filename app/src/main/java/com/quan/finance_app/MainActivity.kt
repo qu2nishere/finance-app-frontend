@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.ui.auth.AuthViewModel
@@ -71,6 +72,7 @@ enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
 @Composable
 fun MainApp(authViewModel: AuthViewModel = viewModel()) {
     val auth by authViewModel.state.collectAsState()
+    val context = LocalContext.current
 
     var isLoggedIn by remember { mutableStateOf(false) }
     var authScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
@@ -108,6 +110,7 @@ fun MainApp(authViewModel: AuthViewModel = viewModel()) {
         when (authScreen) {
             AuthScreen.LOGIN -> LoginScreen(
                 onLogin = { email, password -> authViewModel.login(email, password) },
+                onGoogleLogin = { authViewModel.onGoogleSignInClicked(context) },
                 onGoToRegister = { authViewModel.clearErrors(); authScreen = AuthScreen.REGISTER },
                 onForgotPassword = { authScreen = AuthScreen.VERIFY_EMAIL },
                 loading = auth.loading,
@@ -123,6 +126,7 @@ fun MainApp(authViewModel: AuthViewModel = viewModel()) {
                 onContinue = { fullName, email, password ->
                     authViewModel.register(email, password, fullName)
                 },
+                onGoogleLogin = { authViewModel.onGoogleSignInClicked(context) },
                 onGoToLogin = { authViewModel.clearErrors(); authScreen = AuthScreen.LOGIN },
                 loading = auth.loading,
                 errorMessage = auth.errorMessage,

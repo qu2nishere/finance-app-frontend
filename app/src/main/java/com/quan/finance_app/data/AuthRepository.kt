@@ -34,6 +34,9 @@ class AuthRepository(
     suspend fun login(email: String, password: String): AuthResult =
         perform { api.login(LoginRequestDto(email.trim(), password)) }
 
+    suspend fun loginWithGoogle(idToken: String): AuthResult =
+        perform { api.loginWithGoogle(com.quan.finance_app.data.remote.GoogleLoginRequestDto(idToken)) }
+
     fun logout() = tokenStore.clear()
 
     private suspend fun perform(request: suspend () -> Response<AuthResponseDto>): AuthResult {

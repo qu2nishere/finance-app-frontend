@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -38,6 +39,7 @@ import com.quan.finance_app.ui.theme.*
 @Composable
 fun LoginScreen(
     onLogin: (email: String, password: String) -> Unit = { _, _ -> },
+    onGoogleLogin: () -> Unit = {},
     onGoToRegister: () -> Unit = {},
     onForgotPassword: () -> Unit = {},
     loading: Boolean = false,
@@ -209,9 +211,9 @@ fun LoginScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SocialButton(
                     label = "Google",
-                    icon = Icons.Outlined.Language,
+                    iconRes = com.quan.finance_app.R.drawable.ic_google,
                     modifier = Modifier.weight(1f),
-                    onClick = { if (!loading) onLogin(email, password) }
+                    onClick = { if (!loading) onGoogleLogin() }
                 )
                 SocialButton(
                     label = "Apple",
@@ -367,9 +369,10 @@ internal fun AuthPrimaryButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SocialButton(
+internal fun SocialButton(
     label: String,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconRes: Int? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -384,12 +387,21 @@ private fun SocialButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MoneyFlowTheme.colors.textPrimary,
-                modifier = Modifier.size(17.dp)
-            )
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(18.dp)
+                )
+            } else if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MoneyFlowTheme.colors.textPrimary,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,

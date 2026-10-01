@@ -20,6 +20,10 @@ data class LoginRequestDto(
     val password: String
 )
 
+data class GoogleLoginRequestDto(
+    val idToken: String
+)
+
 data class AuthResponseDto(
     val accessToken: String,
     val tokenType: String,

@@ -17,4 +17,7 @@ interface AuthApi {
 
     @POST("api/auth/login")
     suspend fun login(@Body body: LoginRequestDto): Response<AuthResponseDto>
+
+    @POST("api/v1/auth/google")
+    suspend fun loginWithGoogle(@Body body: GoogleLoginRequestDto): Response<AuthResponseDto>
 }
