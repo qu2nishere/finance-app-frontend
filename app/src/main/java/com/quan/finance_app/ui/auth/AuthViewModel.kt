@@ -4,11 +4,14 @@ import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.quan.finance_app.data.AuthRepository
 import com.quan.finance_app.data.AuthResult
@@ -37,7 +40,7 @@ class AuthViewModel(
 ) : ViewModel() {
 
     companion object {
-        const val SERVER_WEB_CLIENT_ID = "335542221014-1gp0knl4g8u7dmc8u29923v3ihnnpc2s.apps.googleusercontent.com"
+        const val SERVER_WEB_CLIENT_ID = "335542221014-44m3m8dcpsmbcdadev03dtqb2kfopgjk.apps.googleusercontent.com"
     }
 
     private val _state = MutableStateFlow(AuthUiState())
@@ -60,34 +63,56 @@ class AuthViewModel(
         serverClientId: String = SERVER_WEB_CLIENT_ID
     ) {
         val credentialManager = CredentialManager.create(context)
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(serverClientId)
-            .setAutoSelectEnabled(false)
-            .build()
-
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
-            .build()
 
         viewModelScope.launch {
             try {
+                // Dành cho sự kiện bấm nút: dùng GetSignInWithGoogleOption để bật bảng chọn tài khoản
+                val signInOption = GetSignInWithGoogleOption.Builder(serverClientId)
+                    .build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(signInOption)
+                    .build()
+
                 val response = credentialManager.getCredential(context = context, request = request)
-                val credential = response.credential
-                if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    val idToken = googleIdTokenCredential.idToken
-                    loginWithGoogle(idToken)
-                } else {
-                    _state.update { it.copy(errorMessage = "Loại thông tin xác thực không hợp lệ") }
-                }
+                handleCredentialResponse(response)
             } catch (e: GetCredentialCancellationException) {
-                // Người dùng huỷ bỏ hộp thoại chọn tài khoản
+                // Người dùng chủ động đóng hộp thoại chọn tài khoản
+            } catch (e: NoCredentialException) {
+                // Thử lại với GetGoogleIdOption
+                try {
+                    val googleIdOption = GetGoogleIdOption.Builder()
+                        .setFilterByAuthorizedAccounts(false)
+                        .setServerClientId(serverClientId)
+                        .setAutoSelectEnabled(false)
+                        .build()
+                    val fallbackRequest = GetCredentialRequest.Builder()
+                        .addCredentialOption(googleIdOption)
+                        .build()
+                    val response = credentialManager.getCredential(context = context, request = fallbackRequest)
+                    handleCredentialResponse(response)
+                } catch (ex: GetCredentialCancellationException) {
+                    // Người dùng huỷ
+                } catch (ex: Exception) {
+                    _state.update {
+                        it.copy(errorMessage = "Chưa có tài khoản Google trên máy hoặc chưa cấu hình Android Client ID trong Google Cloud.")
+                    }
+                }
             } catch (e: GetCredentialException) {
                 _state.update { it.copy(errorMessage = e.message ?: "Lỗi xác thực Google") }
             } catch (e: Exception) {
                 _state.update { it.copy(errorMessage = e.message ?: "Lỗi đăng nhập Google") }
             }
+        }
+    }
+
+    private fun handleCredentialResponse(response: GetCredentialResponse) {
+        val credential = response.credential
+        if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+            val idToken = googleIdTokenCredential.idToken
+            loginWithGoogle(idToken)
+        } else {
+            _state.update { it.copy(errorMessage = "Loại thông tin xác thực không hợp lệ") }
         }
     }
 
