@@ -24,10 +24,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.data.remote.TransactionDto
 import com.quan.finance_app.ui.components.core.*
 import com.quan.finance_app.ui.theme.*
+import com.quan.finance_app.ui.transaction.AllTransactionsViewModel
+import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 data class LedgerEntry(
+    val id: String = "",
     val title: String,
     val meta: String,
     val amount: Long,
@@ -41,44 +49,69 @@ data class LedgerDay(
     val entries: List<LedgerEntry>
 )
 
-private val ledgerDays = listOf(
-    LedgerDay(
-        "HÔM NAY · 22/08", -117_000L,
-        listOf(
-            LedgerEntry("Highlands Coffee", "Ăn uống · Ví Momo · 09:12", -72_000L, Icons.Outlined.Storefront),
-            LedgerEntry("Grab · đi làm", "Di chuyển · Thẻ ●●42 · 08:05", -45_000L, Icons.Outlined.LocalShipping)
-        )
-    ),
-    LedgerDay(
-        "HÔM QUA · 21/08", -318_000L,
-        listOf(
-            LedgerEntry("VinMart", "Mua sắm · Tiền mặt · 19:44", -318_000L, Icons.Outlined.ShoppingCart)
-        )
-    ),
-    LedgerDay(
-        "THỨ TƯ · 20/08", 17_550_000L,
-        listOf(
-            LedgerEntry("Lương tháng 8", "Lương · Vietcombank ●●42", 18_000_000L, Icons.Outlined.Payments, isIncome = true),
-            LedgerEntry("Tiền điện tháng 7", "Hoá đơn · Vietcombank ●●42", -450_000L, Icons.AutoMirrored.Outlined.ReceiptLong)
-        )
-    )
-)
-
-/**
- * 8c — Tất cả giao dịch, có tìm kiếm & lọc. Mở từ "Tất cả ›" ở trang chủ.
- */
 @Composable
 fun AllTransactionsScreen(
+    allTransactionsViewModel: AllTransactionsViewModel = viewModel(),
     onBack: () -> Unit = {},
     onOpenTransaction: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val uiState by allTransactionsViewModel.state.collectAsState()
     var query by remember { mutableStateOf("") }
-    var categoryFilter by remember { mutableStateOf<String?>("Ăn uống") }
+    var flowFilter by remember { mutableStateOf<String?>("ALL") } // "ALL", "EXPENSE", "INCOME"
 
-    val days = ledgerDays
-        .map { day -> day.copy(entries = day.entries.filter { matchesQuery(it, query) }) }
-        .filter { it.entries.isNotEmpty() }
+    val today = remember { LocalDate.now() }
+    val yesterday = remember { LocalDate.now().minusDays(1) }
+
+    // Map and group transactions by date
+    val groupedDays = remember(uiState.transactions, query, flowFilter) {
+        val filtered = uiState.transactions.filter { txn ->
+            val matchFlow = when (flowFilter) {
+                "EXPENSE" -> txn.type == "EXPENSE"
+                "INCOME" -> txn.type == "INCOME"
+                else -> true
+            }
+            val matchQuery = query.isBlank() ||
+                    (txn.note?.contains(query, ignoreCase = true) == true) ||
+                    (txn.categoryName?.contains(query, ignoreCase = true) == true) ||
+                    (txn.merchant?.contains(query, ignoreCase = true) == true) ||
+                    txn.amount.toString().contains(query)
+
+            matchFlow && matchQuery
+        }
+
+        filtered
+            .groupBy { it.occurredDate }
+            .map { (dateStr, txns) ->
+                val date = runCatching { LocalDate.parse(dateStr) }.getOrNull()
+                val label = when (date) {
+                    today -> "HÔM NAY · ${date.format(DateTimeFormatter.ofPattern("dd/MM"))}"
+                    yesterday -> "HÔM QUA · ${date.format(DateTimeFormatter.ofPattern("dd/MM"))}"
+                    null -> dateStr
+                    else -> "NGÀY · ${date.format(DateTimeFormatter.ofPattern("dd/MM"))}"
+                }
+                val totalSigned = txns.sumOf { it.signedAmount }
+                val entries = txns.map { txn ->
+                    val isIncome = txn.type == "INCOME"
+                    LedgerEntry(
+                        id = txn.id,
+                        title = txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch",
+                        meta = (txn.categoryName ?: "Chưa phân loại") + (txn.walletName?.let { " · $it" } ?: ""),
+                        amount = txn.signedAmount,
+                        icon = getCategoryIcon(txn.categoryName),
+                        isIncome = isIncome
+                    )
+                }
+                LedgerDay(label = label, total = totalSigned, entries = entries)
+            }
+    }
+
+    val totalOut = remember(uiState.transactions) {
+        uiState.transactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+    }
+    val totalIn = remember(uiState.transactions) {
+        uiState.transactions.filter { it.type == "INCOME" }.sumOf { it.amount }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -149,37 +182,21 @@ fun AllTransactionsScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MfPillChip(label = "Tháng 8", selected = true, onClick = { })
-                if (categoryFilter != null) {
-                    Surface(
-                        modifier = Modifier.clickable { categoryFilter = null },
-                        shape = RoundedCornerShape(999.dp),
-                        color = Blue50,
-                        border = BorderStroke(1.dp, Blue200)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = categoryFilter!!,
-                                fontFamily = FontCore,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Blue600
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "Bỏ lọc",
-                                tint = Blue600,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
-                    }
-                }
-                MfPillChip(label = "Tất cả ví", selected = false, onClick = { })
-                MfPillChip(label = "Chi & thu", selected = false, onClick = { })
+                MfPillChip(
+                    label = "Tất cả",
+                    selected = flowFilter == "ALL",
+                    onClick = { flowFilter = "ALL" }
+                )
+                MfPillChip(
+                    label = "Chỉ chi tiêu",
+                    selected = flowFilter == "EXPENSE",
+                    onClick = { flowFilter = "EXPENSE" }
+                )
+                MfPillChip(
+                    label = "Chỉ thu nhập",
+                    selected = flowFilter == "INCOME",
+                    onClick = { flowFilter = "INCOME" }
+                )
             }
         }
 
@@ -190,93 +207,84 @@ fun AllTransactionsScreen(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SummaryCell("Tiền ra", "−9.712.000₫", Heat600, Modifier.weight(1f))
+                    SummaryCell("Tiền ra", "−" + formatVnd(totalOut), Heat600, Modifier.weight(1f))
                     VerticalDivider(
                         modifier = Modifier.height(30.dp),
                         color = MoneyFlowTheme.colors.borderSubtle
                     )
-                    SummaryCell("Tiền vào", "+18.200.000₫", Grow600, Modifier.weight(1f))
+                    SummaryCell("Tiền vào", "+" + formatVnd(totalIn), Grow600, Modifier.weight(1f))
                     VerticalDivider(
                         modifier = Modifier.height(30.dp),
                         color = MoneyFlowTheme.colors.borderSubtle
                     )
                     Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                         Text(
-                            text = "42 giao dịch",
+                            text = "${uiState.transactions.size} giao dịch",
                             fontFamily = FontCore,
                             fontSize = 10.sp,
                             color = MoneyFlowTheme.colors.textSecondary
                         )
-                        Text(
-                            text = "TB 313k/ngày",
-                            fontFamily = FontCore,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            color = MoneyFlowTheme.colors.textSecondary
-                        )
                     }
                 }
             }
         }
 
-        // Nhóm theo ngày
-        days.forEach { day ->
-            item {
-                Spacer(modifier = Modifier.height(2.dp))
-                MfSectionLabel(day.label, trailing = signedVnd(day.total))
+        if (uiState.isLoading) {
+            // Skeleton Loading Placeholders
+            items(3) {
+                AllTransactionsDaySkeleton()
+                Spacer(modifier = Modifier.height(8.dp))
             }
+        } else if (groupedDays.isEmpty()) {
             item {
-                MfCard {
-                    day.entries.forEachIndexed { index, entry ->
-                        MfRow(
-                            title = entry.title,
-                            icon = entry.icon,
-                            iconTint = if (entry.isIncome) Grow600 else Heat600,
-                            iconBackground = if (entry.isIncome) Grow50 else Heat50,
-                            subtitle = entry.meta,
-                            onClick = { onOpenTransaction(entry.title) },
-                            trailing = {
-                                Text(
-                                    text = signedVnd(entry.amount),
-                                    fontFamily = FontMono,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = if (entry.isIncome) Grow600 else MoneyFlowTheme.colors.textPrimary
-                                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (query.isNotBlank()) "Không có giao dịch nào khớp “$query”." else "Chưa có giao dịch nào.",
+                        fontFamily = FontCore,
+                        fontSize = 14.sp,
+                        color = MoneyFlowTheme.colors.textSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            // Nhóm theo ngày
+            groupedDays.forEach { day ->
+                item {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    MfSectionLabel(day.label, trailing = signedVnd(day.total))
+                }
+                item {
+                    MfCard {
+                        day.entries.forEachIndexed { index, entry ->
+                            MfRow(
+                                title = entry.title,
+                                icon = entry.icon,
+                                iconTint = if (entry.isIncome) Grow600 else Heat600,
+                                iconBackground = if (entry.isIncome) Grow50 else Heat50,
+                                subtitle = entry.meta,
+                                onClick = { onOpenTransaction(entry.title) },
+                                trailing = {
+                                    Text(
+                                        text = signedVnd(entry.amount),
+                                        fontFamily = FontMono,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = if (entry.isIncome) Grow600 else MoneyFlowTheme.colors.textPrimary
+                                    )
+                                }
+                            )
+                            if (index != day.entries.lastIndex) {
+                                HorizontalDivider(color = MoneyFlowTheme.colors.borderSubtle)
                             }
-                        )
-                        if (index != day.entries.lastIndex) {
-                            HorizontalDivider(color = MoneyFlowTheme.colors.borderSubtle)
                         }
                     }
                 }
-            }
-        }
-
-        if (days.isEmpty()) {
-            item {
-                Text(
-                    text = "Không có giao dịch nào khớp “$query”.",
-                    fontFamily = FontCore,
-                    fontSize = 13.sp,
-                    color = MoneyFlowTheme.colors.textSecondary,
-                    modifier = Modifier.padding(vertical = 24.dp)
-                )
-            }
-        } else {
-            item {
-                Text(
-                    text = "Tải thêm 37 giao dịch",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { }
-                        .padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center,
-                    fontFamily = FontCore,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Blue600
-                )
             }
         }
     }
@@ -301,15 +309,6 @@ private fun SummaryCell(label: String, amount: String, color: Color, modifier: M
     }
 }
 
-private fun matchesQuery(entry: LedgerEntry, query: String): Boolean {
-    if (query.isBlank()) return true
-    val q = query.trim()
-    return entry.title.contains(q, ignoreCase = true) ||
-        entry.meta.contains(q, ignoreCase = true) ||
-        entry.amount.toString().contains(q)
-}
-
-/** -72000 -> "−72.000₫" · 18000000 -> "+18.000.000₫" */
 internal fun signedVnd(amount: Long): String {
     val sign = if (amount < 0) "−" else "+"
     return sign + formatVnd(kotlin.math.abs(amount))

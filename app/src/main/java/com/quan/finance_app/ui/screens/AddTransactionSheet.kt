@@ -11,12 +11,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.*
@@ -32,10 +32,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.data.remote.CategoryDto
+import com.quan.finance_app.data.remote.WalletDto
+import com.quan.finance_app.ui.components.core.SkeletonBox
 import com.quan.finance_app.ui.components.forms.CalculatorKeypad
-import com.quan.finance_app.ui.theme.MoneyFlowTheme
 import com.quan.finance_app.ui.theme.FontCore
 import com.quan.finance_app.ui.theme.FontMono
+import com.quan.finance_app.ui.theme.MoneyFlowTheme
+import com.quan.finance_app.ui.transaction.TransactionViewModel
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -46,19 +51,26 @@ import java.util.Locale
 fun AddTransactionScreen(
     onDismissRequest: () -> Unit,
     onOpenAutoSave: () -> Unit = {},
+    transactionViewModel: TransactionViewModel = viewModel(),
+    onTransactionCreated: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val uiState by transactionViewModel.state.collectAsState()
+
     var isExpense by remember { mutableStateOf(true) }
-    // 4b: mức trích cho chính khoản thu này — sửa tại chỗ bằng "Đổi %"
     var autoSaveEnabled by remember { mutableStateOf(true) }
     var autoSavePercent by remember { mutableIntStateOf(20) }
     var expression by remember { mutableStateOf("") }
+    var noteText by remember { mutableStateOf("") }
     var showCalculator by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    var showWalletPicker by remember { mutableStateOf(false) }
+    var showNoteDialog by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("vi", "VN")) }
-    
-    // Simple evaluator
+
+    // Evaluator
     val calculatedAmount = remember(expression) {
         evaluateExpression(expression)
     }
@@ -72,7 +84,7 @@ fun AddTransactionScreen(
 
     // Animations for 3D shrink effect
     val scale by animateFloatAsState(
-        targetValue = if (showDatePicker) 0.92f else 1f, 
+        targetValue = if (showDatePicker) 0.92f else 1f,
         animationSpec = tween(300),
         label = "scale"
     )
@@ -83,7 +95,6 @@ fun AddTransactionScreen(
     )
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
-        // Main Screen Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -95,7 +106,7 @@ fun AddTransactionScreen(
                     shape = RoundedCornerShape(cornerRadius)
                 }
                 .background(MoneyFlowTheme.colors.surfaceCard)
-                .navigationBarsPadding() // Thêm padding sau background để nền trắng phủ kín viền
+                .navigationBarsPadding()
                 .statusBarsPadding()
         ) {
             Column(
@@ -103,306 +114,364 @@ fun AddTransactionScreen(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
             ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismissRequest) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MoneyFlowTheme.colors.textPrimary)
-                }
-                Text(
-                    text = "Thêm giao dịch",
-                    style = MoneyFlowTheme.typography.title2,
-                    color = MoneyFlowTheme.colors.textPrimary,
-                    fontFamily = FontCore
-                )
-                TextButton(onClick = { /* Repeat */ }) {
-                    Text(
-                        text = "Lặp lại",
-                        style = MoneyFlowTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
-                        color = MoneyFlowTheme.colors.textBrand,
-                        fontFamily = FontCore
-                    )
-                }
-            }
-
-            // Toggle Chi / Thu
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Chi Button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (isExpense) MoneyFlowTheme.colors.flowOut else Color.White)
-                        .border(1.dp, if (isExpense) Color.Transparent else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(24.dp))
-                        .clickable { isExpense = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Chi",
-                        color = if (isExpense) Color.White else MoneyFlowTheme.colors.textSecondary,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontCore
-                    )
-                }
-                // Thu Button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (!isExpense) MoneyFlowTheme.colors.flowIn else Color.White)
-                        .border(1.dp, if (!isExpense) Color.Transparent else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(24.dp))
-                        .clickable { isExpense = false },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Thu",
-                        color = if (!isExpense) Color.White else MoneyFlowTheme.colors.textSecondary,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontCore
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Amount Area
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { showCalculator = !showCalculator },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = expression.ifEmpty { "0" },
-                    color = MoneyFlowTheme.colors.textSecondary,
-                    fontSize = 16.sp,
-                    fontFamily = FontMono
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = formattedCalculated,
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
-                        fontFamily = FontMono
-                    )
-                    Text(
-                        text = "đ",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
-                        modifier = Modifier.padding(bottom = 6.dp),
-                        fontFamily = FontCore
-                    )
-                }
-                // Underline
-                Box(
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(2.dp)
-                        .background(if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Selectors
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isExpense) {
-                    SelectorButton(
-                        icon = Icons.Outlined.Storefront,
-                        label = "Danh mục · ",
-                        value = "Ăn uống",
-                        valueBold = true,
-                        brandColor = MoneyFlowTheme.colors.flowOut,
-                        brandSoftColor = MoneyFlowTheme.colors.surfaceOutSoft
-                    )
-                    SelectorButton(
-                        icon = Icons.Outlined.AccountBalanceWallet,
-                        label = "Nguồn tiền · ",
-                        value = "Ví Momo",
-                        valueBold = false,
-                        brandColor = MoneyFlowTheme.colors.flowOut,
-                        brandSoftColor = MoneyFlowTheme.colors.surfaceOutSoft
-                    )
-                } else {
-                    SelectorButton(
-                        icon = Icons.Outlined.Payments,
-                        label = "Nguồn thu · ",
-                        value = "Lương",
-                        valueBold = true,
-                        brandColor = MoneyFlowTheme.colors.flowIn,
-                        brandSoftColor = MoneyFlowTheme.colors.surfaceInSoft
-                    )
-                    
-                    // Quick Chips Row
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(listOf("Lương", "Thưởng", "Freelance", "Đầu tư")) { chip ->
-                            val isSelected = chip == "Lương"
-                            Box(
-                                modifier = Modifier
-                                    .height(36.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(if (isSelected) MoneyFlowTheme.colors.surfaceInSoft else Color.White)
-                                    .border(1.dp, if (isSelected) MoneyFlowTheme.colors.flowIn else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(18.dp))
-                                    .clickable { /* select chip */ }
-                                    .padding(horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = chip,
-                                    color = if (isSelected) MoneyFlowTheme.colors.flowIn else MoneyFlowTheme.colors.textSecondary,
-                                    style = MoneyFlowTheme.typography.caption,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                    
-                    SelectorButton(
-                        icon = Icons.Outlined.AccountBalanceWallet,
-                        label = "Vào ví · ",
-                        value = "Vietcombank ••42",
-                        valueBold = false,
-                        brandColor = MoneyFlowTheme.colors.borderSubtle,
-                        brandSoftColor = MoneyFlowTheme.colors.surfacePage
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Actions Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Date Action
+                // Header
                 Row(
                     modifier = Modifier
-                        .weight(1.5f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MoneyFlowTheme.colors.surfacePage)
-                        .clickable { showDatePicker = true }
-                        .padding(horizontal = 12.dp),
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = MoneyFlowTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = selectedDate.format(dateFormatter), style = MoneyFlowTheme.typography.caption, color = MoneyFlowTheme.colors.textPrimary, fontFamily = FontCore)
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MoneyFlowTheme.colors.textPrimary)
+                    }
+                    Text(
+                        text = "Thêm giao dịch",
+                        style = MoneyFlowTheme.typography.title2,
+                        color = MoneyFlowTheme.colors.textPrimary,
+                        fontFamily = FontCore
+                    )
+                    Spacer(modifier = Modifier.size(48.dp))
                 }
 
-                if (isExpense) {
+                // Toggle Chi / Thu
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Chi Button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(if (isExpense) MoneyFlowTheme.colors.flowOut else Color.White)
+                            .border(1.dp, if (isExpense) Color.Transparent else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(24.dp))
+                            .clickable {
+                                isExpense = true
+                                transactionViewModel.setExpense(true)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Chi tiêu",
+                            color = if (isExpense) Color.White else MoneyFlowTheme.colors.textSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            fontFamily = FontCore
+                        )
+                    }
+
+                    // Thu Button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(if (!isExpense) MoneyFlowTheme.colors.flowIn else Color.White)
+                            .border(1.dp, if (!isExpense) Color.Transparent else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(24.dp))
+                            .clickable {
+                                isExpense = false
+                                transactionViewModel.setExpense(false)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Thu nhập",
+                            color = if (!isExpense) Color.White else MoneyFlowTheme.colors.textSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            fontFamily = FontCore
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Amount Display Area
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showCalculator = !showCalculator }
+                        .padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = if (showCalculator && expression.isNotEmpty()) expression else "Chạm để nhập số tiền",
+                        style = MoneyFlowTheme.typography.caption,
+                        color = MoneyFlowTheme.colors.textSecondary,
+                        fontFamily = FontCore
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = formattedCalculated,
+                            fontSize = 44.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
+                            fontFamily = FontMono
+                        )
+                        Text(
+                            text = " ₫",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
+                            modifier = Modifier.padding(bottom = 6.dp),
+                            fontFamily = FontCore
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(200.dp)
+                            .height(2.dp)
+                            .background(if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Selectors & Quick Chips
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (uiState.isLoading) {
+                        // Skeleton loading for selectors
+                        SkeletonBox(modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp))
+                        SkeletonBox(modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(16.dp))
+                    } else {
+                        val currentCategoryName = uiState.selectedCategory?.name ?: "Chọn danh mục"
+                        val currentWalletName = uiState.selectedWallet?.name ?: "Chọn ví"
+
+                        if (isExpense) {
+                            SelectorButton(
+                                icon = getCategoryIcon(uiState.selectedCategory?.name),
+                                label = "Danh mục · ",
+                                value = currentCategoryName,
+                                valueBold = true,
+                                brandColor = MoneyFlowTheme.colors.flowOut,
+                                brandSoftColor = MoneyFlowTheme.colors.surfaceOutSoft,
+                                onClick = { showCategoryPicker = true }
+                            )
+
+                            // Quick expense chips
+                            val expenseCats = uiState.categories.filter { it.flow == "EXPENSE" }
+                            if (expenseCats.isNotEmpty()) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(expenseCats.take(5)) { cat ->
+                                        val isSelected = uiState.selectedCategory?.id == cat.id
+                                        Box(
+                                            modifier = Modifier
+                                                .height(36.dp)
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .background(if (isSelected) MoneyFlowTheme.colors.surfaceOutSoft else Color.White)
+                                                .border(1.dp, if (isSelected) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(18.dp))
+                                                .clickable { transactionViewModel.selectCategory(cat) }
+                                                .padding(horizontal = 16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = cat.name,
+                                                color = if (isSelected) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.textSecondary,
+                                                style = MoneyFlowTheme.typography.caption,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            SelectorButton(
+                                icon = Icons.Outlined.AccountBalanceWallet,
+                                label = "Nguồn tiền · ",
+                                value = currentWalletName,
+                                valueBold = false,
+                                brandColor = MoneyFlowTheme.colors.flowOut,
+                                brandSoftColor = MoneyFlowTheme.colors.surfaceOutSoft,
+                                onClick = { showWalletPicker = true }
+                            )
+                        } else {
+                            SelectorButton(
+                                icon = getCategoryIcon(uiState.selectedCategory?.name),
+                                label = "Nguồn thu · ",
+                                value = currentCategoryName,
+                                valueBold = true,
+                                brandColor = MoneyFlowTheme.colors.flowIn,
+                                brandSoftColor = MoneyFlowTheme.colors.surfaceInSoft,
+                                onClick = { showCategoryPicker = true }
+                            )
+
+                            // Quick Income Chips
+                            val incomeCats = uiState.categories.filter { it.flow == "INCOME" }
+                            if (incomeCats.isNotEmpty()) {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(incomeCats) { chip ->
+                                        val isSelected = uiState.selectedCategory?.id == chip.id
+                                        Box(
+                                            modifier = Modifier
+                                                .height(36.dp)
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .background(if (isSelected) MoneyFlowTheme.colors.surfaceInSoft else Color.White)
+                                                .border(1.dp, if (isSelected) MoneyFlowTheme.colors.flowIn else MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(18.dp))
+                                                .clickable { transactionViewModel.selectCategory(chip) }
+                                                .padding(horizontal = 16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = chip.name,
+                                                color = if (isSelected) MoneyFlowTheme.colors.flowIn else MoneyFlowTheme.colors.textSecondary,
+                                                style = MoneyFlowTheme.typography.caption,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            SelectorButton(
+                                icon = Icons.Outlined.AccountBalanceWallet,
+                                label = "Vào ví · ",
+                                value = currentWalletName,
+                                valueBold = false,
+                                brandColor = MoneyFlowTheme.colors.borderSubtle,
+                                brandSoftColor = MoneyFlowTheme.colors.surfacePage,
+                                onClick = { showWalletPicker = true }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Date & Note Action Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Date Action
+                    Row(
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MoneyFlowTheme.colors.surfacePage)
+                            .clickable { showDatePicker = true }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = MoneyFlowTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = selectedDate.format(dateFormatter), style = MoneyFlowTheme.typography.caption, color = MoneyFlowTheme.colors.textPrimary, fontFamily = FontCore)
+                    }
+
                     // Note Action
                     Row(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(1.5f)
                             .height(44.dp)
-                            .border(1.dp, MoneyFlowTheme.colors.surfaceOutSoft, RoundedCornerShape(12.dp))
+                            .border(1.dp, if (isExpense) MoneyFlowTheme.colors.surfaceOutSoft else MoneyFlowTheme.colors.surfaceInSoft, RoundedCornerShape(12.dp))
                             .background(Color.White, RoundedCornerShape(12.dp))
+                            .clickable { showNoteDialog = true }
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Outlined.Edit, contentDescription = null, tint = MoneyFlowTheme.colors.flowOut, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Ghi chú", style = MoneyFlowTheme.typography.caption, color = MoneyFlowTheme.colors.flowOut, fontFamily = FontCore)
-                    }
-
-                    // Camera Action
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .border(1.dp, MoneyFlowTheme.colors.surfaceOutSoft, RoundedCornerShape(12.dp))
-                            .background(Color.White, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = MoneyFlowTheme.colors.flowOut, modifier = Modifier.size(18.dp))
-                    }
-                } else {
-                    // Repeat Action
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .border(1.dp, MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(12.dp))
-                            .background(Color.White, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(Icons.Outlined.Sync, contentDescription = null, tint = MoneyFlowTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Lặp hằng tháng", style = MoneyFlowTheme.typography.caption, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontCore)
+                        Icon(
+                            Icons.Outlined.Edit,
+                            contentDescription = null,
+                            tint = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (noteText.isBlank()) "Ghi chú" else noteText,
+                            style = MoneyFlowTheme.typography.caption,
+                            color = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
+                            fontFamily = FontCore,
+                            maxLines = 1
+                        )
                     }
                 }
-            }
-            
-            if (!isExpense) {
-                Spacer(modifier = Modifier.height(16.dp))
-                AutoSaveIncomeCard(
-                    enabled = autoSaveEnabled,
-                    onEnabledChange = { autoSaveEnabled = it },
-                    percent = autoSavePercent,
-                    incomeAmount = calculatedAmount,
-                    onChangePercent = {
-                        autoSavePercent = if (autoSavePercent >= 50) 5 else autoSavePercent + 5
+
+                if (!isExpense) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    AutoSaveIncomeCard(
+                        enabled = autoSaveEnabled,
+                        onEnabledChange = { autoSaveEnabled = it },
+                        percent = autoSavePercent,
+                        incomeAmount = calculatedAmount,
+                        onChangePercent = {
+                            autoSavePercent = if (autoSavePercent >= 50) 5 else autoSavePercent + 5
+                        },
+                        onOpenSettings = onOpenAutoSave,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+
+                if (uiState.errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = uiState.errorMessage!!,
+                        color = Color.Red,
+                        style = MoneyFlowTheme.typography.caption,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Primary Save Button
+                Button(
+                    onClick = {
+                        val amountLong = calculatedAmount.toLong()
+                        transactionViewModel.submitTransaction(
+                            amount = amountLong,
+                            date = selectedDate,
+                            note = noteText,
+                            onSuccess = {
+                                onTransactionCreated()
+                                onDismissRequest()
+                            }
+                        )
                     },
-                    onOpenSettings = onOpenAutoSave,
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-            }
+                    enabled = !uiState.isSubmitting && calculatedAmount > 0,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    if (uiState.isSubmitting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text(
+                            text = if (isExpense) "Lưu khoản chi" else "Lưu khoản thu",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            fontFamily = FontCore
+                        )
+                    }
+                }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Primary Save Button
-            Button(
-                onClick = onDismissRequest,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    text = if (isExpense) "Lưu khoản chi" else "Lưu khoản thu",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    fontFamily = FontCore
-                )
+                Spacer(modifier = Modifier.height(24.dp))
             }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-        }
 
             // Calculator Keypad
             AnimatedVisibility(
@@ -423,7 +492,7 @@ fun AddTransactionScreen(
                             }
                             "=" -> {
                                 expression = calculatedAmount.toLong().toString()
-                                showCalculator = false // Tự động đóng bàn phím khi ấn =
+                                showCalculator = false
                             }
                             else -> {
                                 expression += key
@@ -432,7 +501,7 @@ fun AddTransactionScreen(
                     }
                 )
             }
-            
+
             if (!showCalculator) {
                 Spacer(modifier = Modifier.height(32.dp))
             }
@@ -457,6 +526,64 @@ fun AddTransactionScreen(
             brandSoftColor = if (isExpense) MoneyFlowTheme.colors.surfaceOutSoft else MoneyFlowTheme.colors.surfaceInSoft
         )
     }
+
+    if (showCategoryPicker) {
+        val flowStr = if (isExpense) "EXPENSE" else "INCOME"
+        val filteredCats = uiState.categories.filter { it.flow == flowStr }
+        CategoryPickerSheet(
+            onDismissRequest = { showCategoryPicker = false },
+            categories = filteredCats,
+            isLoading = uiState.isLoading,
+            currentFlow = flowStr,
+            onCategorySelected = { cat ->
+                transactionViewModel.selectCategory(cat)
+                showCategoryPicker = false
+            },
+            onAddCategory = { name, flow ->
+                transactionViewModel.createCategory(name, flow) { createdCat ->
+                    transactionViewModel.selectCategory(createdCat)
+                }
+            }
+        )
+    }
+
+    if (showWalletPicker) {
+        WalletPickerSheet(
+            onDismissRequest = { showWalletPicker = false },
+            wallets = uiState.wallets,
+            selectedWallet = uiState.selectedWallet,
+            isLoading = uiState.isLoading,
+            onWalletSelected = { wallet ->
+                transactionViewModel.selectWallet(wallet)
+                showWalletPicker = false
+            },
+            onAddWallet = { name, kind, initialBalance ->
+                transactionViewModel.createWallet(name, kind, initialBalance) { newWallet ->
+                    transactionViewModel.selectWallet(newWallet)
+                }
+            }
+        )
+    }
+
+    if (showNoteDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoteDialog = false },
+            title = { Text("Ghi chú giao dịch") },
+            text = {
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    placeholder = { Text("Ví dụ: Ăn trưa với đồng nghiệp") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showNoteDialog = false }) {
+                    Text("Xong")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -466,14 +593,17 @@ fun SelectorButton(
     value: String,
     valueBold: Boolean,
     brandColor: Color,
-    brandSoftColor: Color
+    brandSoftColor: Color,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .background(Color.White, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
             .border(1.dp, brandColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -503,22 +633,17 @@ fun SelectorButton(
     }
 }
 
-// Very basic math expression evaluator
 fun evaluateExpression(expr: String): Double {
     if (expr.isEmpty()) return 0.0
-    // Replace visual operators with standard ones, remove formatting dots
     val cleanExpr = expr.replace("×", "*").replace("÷", "/").replace(".", "")
-    
-    // A simplified evaluator that processes operators sequentially for this demo
     return try {
         var currentNumber = ""
         var currentResult = 0.0
         var currentOp = '+'
-        
+
         for (i in cleanExpr.indices) {
             val char = cleanExpr[i]
             if (char.isDigit() || char == ',') {
-                // Ignore comma for now or replace with dot if it's decimal
                 if (char != ',') {
                     currentNumber += char
                 }

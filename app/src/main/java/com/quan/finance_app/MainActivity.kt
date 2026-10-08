@@ -27,6 +27,8 @@ import com.quan.finance_app.ui.auth.AuthViewModel
 import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
+import com.quan.finance_app.ui.home.HomeViewModel
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +72,10 @@ sealed interface Route {
 enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
 
 @Composable
-fun MainApp(authViewModel: AuthViewModel = viewModel()) {
+fun MainApp(
+    authViewModel: AuthViewModel = viewModel(),
+    homeViewModel: HomeViewModel = viewModel()
+) {
     val auth by authViewModel.state.collectAsState()
     val context = LocalContext.current
 
@@ -80,7 +85,11 @@ fun MainApp(authViewModel: AuthViewModel = viewModel()) {
     // Gọi API xong thì mới điều hướng. consumeNavigation() tắt cờ để không chạy lại.
     LaunchedEffect(auth.loginSuccess, auth.registerSuccess) {
         when {
-            auth.loginSuccess -> { isLoggedIn = true; authViewModel.consumeNavigation() }
+            auth.loginSuccess -> {
+                isLoggedIn = true
+                authViewModel.consumeNavigation()
+                homeViewModel.loadData()
+            }
             auth.registerSuccess -> { authScreen = AuthScreen.REGISTER_2; authViewModel.consumeNavigation() }
         }
     }
@@ -181,6 +190,7 @@ fun MainApp(authViewModel: AuthViewModel = viewModel()) {
                 if (route == null) {
                     when (selectedTab) {
                         0 -> HomeScreen(
+                            homeViewModel = homeViewModel,
                             onSeeAllTransactions = { push(Route.AllTransactions) },
                             onScanBill = { showScanReceipt = true },
                             onAddExpense = { showAddSheet = true },
@@ -284,6 +294,9 @@ fun MainApp(authViewModel: AuthViewModel = viewModel()) {
                 onOpenAutoSave = {
                     showAddSheet = false
                     push(Route.AutoSave)
+                },
+                onTransactionCreated = {
+                    homeViewModel.loadData()
                 }
             )
         }
@@ -302,6 +315,7 @@ fun MainApp(authViewModel: AuthViewModel = viewModel()) {
         if (showCategoryPicker) {
             CategoryPickerSheet(
                 onDismissRequest = { showCategoryPicker = false },
+                categories = com.quan.finance_app.data.LedgerRepository.DEFAULT_CATEGORIES,
                 onCategorySelected = { showCategoryPicker = false }
             )
         }
