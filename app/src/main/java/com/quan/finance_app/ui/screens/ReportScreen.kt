@@ -35,6 +35,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.theme.*
 
 data class DualBarData(
@@ -54,8 +55,8 @@ fun ReportScreen(modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+            .background(Ink50),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // 1. Month Selector Header
@@ -118,19 +119,19 @@ fun ReportScreen(modifier: Modifier = Modifier) {
                     InsightBanner(
                         icon = Icons.Outlined.Info,
                         text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append("Chỗ tiêu nhiều nhất tháng này là ")
                             }
                             withStyle(
                                 SpanStyle(
-                                    color = Color(0xFF2C220E),
+                                    color = Ink900,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontCore
                                 )
                             ) {
                                 append("cà phê (18 lần, 1,1tr)")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append(" – đặt ngân sách?")
                             }
                         }
@@ -193,31 +194,31 @@ fun ReportScreen(modifier: Modifier = Modifier) {
                     InsightBanner(
                         icon = Icons.Outlined.FlashOn,
                         text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append("Giữ nhịp này, cuối năm bạn dư ")
                             }
                             withStyle(
                                 SpanStyle(
-                                    color = Color(0xFF2C220E),
+                                    color = Ink900,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontCore
                                 )
                             ) {
                                 append("~68tr")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append(". Chuyển ")
                             }
                             withStyle(
                                 SpanStyle(
-                                    color = Color(0xFF2C220E),
+                                    color = Ink900,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontCore
                                 )
                             ) {
                                 append("5tr/tháng")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append(" vào quỹ dự phòng?")
                             }
                         }
@@ -239,40 +240,28 @@ fun MonthSelectorHeader(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onPreviousMonth,
-            modifier = Modifier.size(36.dp)
-        ) {
+    MfTabHeader(title = "Thống kê") {
+        IconButton(onClick = onPreviousMonth, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
                 contentDescription = "Tháng trước",
                 tint = MoneyFlowTheme.colors.textSecondary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
-
         Text(
             text = "Tháng $month, $year",
             fontFamily = FontCore,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
             color = MoneyFlowTheme.colors.textPrimary
         )
-
-        IconButton(
-            onClick = onNextMonth,
-            modifier = Modifier.size(36.dp)
-        ) {
+        IconButton(onClick = onNextMonth, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = "Tháng sau",
                 tint = MoneyFlowTheme.colors.textSecondary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
     }
@@ -285,10 +274,7 @@ fun ReportTabs(
     onTabSelected: (Int) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEachIndexed { index, title ->
@@ -303,11 +289,12 @@ fun ReportTabs(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
+                    .weight(1f)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onTabSelected(index) }
-                    .padding(vertical = 6.dp, horizontal = 12.dp)
+                    .padding(vertical = 6.dp)
             ) {
                 Text(
                     text = title,
@@ -340,10 +327,10 @@ fun ReportTabs(
 fun ExpenseOverviewCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -383,14 +370,14 @@ fun ExpenseOverviewCard() {
 
                 Row(
                     modifier = Modifier
-                        .background(Color(0xFFE8F8F0), RoundedCornerShape(12.dp))
+                        .background(Grow50, RoundedCornerShape(12.dp))
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "▼",
                         fontSize = 9.sp,
-                        color = Color(0xFF0FA162),
+                        color = Grow500,
                         fontFamily = FontCore
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -399,7 +386,7 @@ fun ExpenseOverviewCard() {
                         fontFamily = FontMono,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
-                        color = Color(0xFF0FA162)
+                        color = Grow500
                     )
                 }
             }
@@ -416,11 +403,11 @@ fun ExpenseOverviewCard() {
                     Triple("T8", 0.74f, true)
                 ),
                 activeColor = Heat500,
-                inactiveColor = Color(0xFFFFE0D2)
+                inactiveColor = Heat100
             )
 
             Spacer(modifier = Modifier.height(20.dp))
-            DashedDivider(color = Color(0xFFDCE2EC))
+            DashedDivider(color = Ink200)
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -447,10 +434,10 @@ fun ExpenseOverviewCard() {
 fun ExpenseCategoryCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -481,7 +468,7 @@ fun ExpenseCategoryCard() {
                 amount = "1.560.000₫",
                 percent = "16%",
                 progress = 0.32f,
-                progressColor = Color(0xFFFF9E6E)
+                progressColor = Heat300
             )
 
             CategoryProgressItem(
@@ -489,7 +476,7 @@ fun ExpenseCategoryCard() {
                 amount = "1.410.000₫",
                 percent = "15%",
                 progress = 0.30f,
-                progressColor = Color(0xFFFFC3A3)
+                progressColor = Heat200
             )
         }
     }
@@ -503,10 +490,10 @@ fun ExpenseCategoryCard() {
 fun IncomeOverviewCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -546,7 +533,7 @@ fun IncomeOverviewCard() {
 
                 Row(
                     modifier = Modifier
-                        .background(Color(0xFFE8F8F0), RoundedCornerShape(12.dp))
+                        .background(Grow50, RoundedCornerShape(12.dp))
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -574,11 +561,11 @@ fun IncomeOverviewCard() {
                     Triple("T8", 0.85f, true)
                 ),
                 activeColor = Grow500,
-                inactiveColor = Color(0xFFC9F5DD)
+                inactiveColor = Grow100
             )
 
             Spacer(modifier = Modifier.height(20.dp))
-            DashedDivider(color = Color(0xFFDCE2EC))
+            DashedDivider(color = Ink200)
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -605,10 +592,10 @@ fun IncomeOverviewCard() {
 fun IncomeSourceCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -629,7 +616,7 @@ fun IncomeSourceCard() {
                 amount = "200.000₫",
                 percent = "1,1%",
                 progress = 0.12f,
-                progressColor = Color(0xFF92E8BC)
+                progressColor = Grow200
             )
 
             CategoryProgressItem(
@@ -637,7 +624,7 @@ fun IncomeSourceCard() {
                 amount = "0₫",
                 percent = "0%",
                 progress = 0.0f,
-                progressColor = Color(0xFFDCE2EC),
+                progressColor = Ink200,
                 trendText = "chưa có tháng này",
                 trendUp = null
             )
@@ -649,10 +636,10 @@ fun IncomeSourceCard() {
 fun SavingsRateCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -752,10 +739,10 @@ fun SavingsRateCard() {
 fun CashflowOverviewCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -795,7 +782,7 @@ fun CashflowOverviewCard() {
 
                 Row(
                     modifier = Modifier
-                        .background(Color(0xFFE8F8F0), RoundedCornerShape(12.dp))
+                        .background(Grow50, RoundedCornerShape(12.dp))
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -870,10 +857,10 @@ fun CashflowOverviewCard() {
 fun CashflowPeriodSummaryCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -881,40 +868,40 @@ fun CashflowPeriodSummaryCard() {
         ) {
             CashflowSummaryRow(
                 icon = Icons.Outlined.AccountBalanceWallet,
-                iconBg = Color(0xFFF0F4F8),
+                iconBg = Ink100,
                 iconTint = Ink600,
                 title = "Số dư đầu kỳ",
                 amount = "11.510.000₫",
                 amountColor = MoneyFlowTheme.colors.textPrimary
             )
 
-            HorizontalDivider(color = Color(0xFFF4F6F9))
+            HorizontalDivider(color = Ink100)
 
             CashflowSummaryRow(
                 icon = Icons.AutoMirrored.Outlined.CallMade,
-                iconBg = Color(0xFFE8F8F0),
+                iconBg = Grow50,
                 iconTint = Grow500,
                 title = "Tiền vào",
                 amount = "+18.200.000₫",
                 amountColor = Grow500
             )
 
-            HorizontalDivider(color = Color(0xFFF4F6F9))
+            HorizontalDivider(color = Ink100)
 
             CashflowSummaryRow(
                 icon = Icons.AutoMirrored.Outlined.ArrowForward,
-                iconBg = Color(0xFFEEF4FF),
+                iconBg = Blue50,
                 iconTint = Blue500,
                 title = "Tiền ra",
                 amount = "-9.712.000₫",
                 amountColor = Heat500
             )
 
-            HorizontalDivider(color = Color(0xFFF4F6F9))
+            HorizontalDivider(color = Ink100)
 
             CashflowSummaryRow(
                 icon = Icons.Outlined.CheckCircleOutline,
-                iconBg = Color(0xFFE8F8F0),
+                iconBg = Grow50,
                 iconTint = Grow500,
                 title = "Số dư cuối kỳ",
                 amount = "19.998.000₫",
@@ -976,10 +963,10 @@ fun CashflowSummaryRow(
 fun WalletBreakdownCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -1009,7 +996,7 @@ fun WalletBreakdownCard() {
                 amount = "-320.000₫",
                 isPositive = false,
                 progress = 0.10f,
-                progressColor = Color(0xFFFFC3A3)
+                progressColor = Heat200
             )
         }
     }
@@ -1065,7 +1052,7 @@ fun WalletProgressItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .background(Color(0xFFF0F2F6), RoundedCornerShape(4.dp))
+                .background(Ink100, RoundedCornerShape(4.dp))
         ) {
             Box(
                 modifier = Modifier
@@ -1167,7 +1154,7 @@ fun DualMonthlyBarChart(
                             .weight(1f)
                             .fillMaxHeight(if (maxFraction > 0f) item.inFraction / maxFraction else 0f)
                             .background(
-                                color = if (item.isCurrent) Grow500 else Color(0xFFC9F5DD),
+                                color = if (item.isCurrent) Grow500 else Grow100,
                                 shape = RoundedCornerShape(4.dp)
                             )
                     )
@@ -1177,7 +1164,7 @@ fun DualMonthlyBarChart(
                             .weight(1f)
                             .fillMaxHeight(if (maxFraction > 0f) item.outFraction / maxFraction else 0f)
                             .background(
-                                color = if (item.isCurrent) Heat500 else Color(0xFFFFE0D2),
+                                color = if (item.isCurrent) Heat500 else Heat100,
                                 shape = RoundedCornerShape(4.dp)
                             )
                     )
@@ -1261,7 +1248,7 @@ fun CategoryProgressItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .background(Color(0xFFF0F2F6), RoundedCornerShape(4.dp))
+                .background(Ink100, RoundedCornerShape(4.dp))
         ) {
             Box(
                 modifier = Modifier
@@ -1295,7 +1282,7 @@ fun CategoryProgressItem(
 
 @Composable
 fun DashedDivider(
-    color: Color = Color(0xFFDCE2EC),
+    color: Color = Ink200,
     thickness: Dp = 1.dp,
     dashLength: Dp = 4.dp,
     gapLength: Dp = 4.dp,
@@ -1329,8 +1316,8 @@ fun InsightBanner(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFFFFF8E6),
-        border = BorderStroke(1.dp, Color(0xFFFFEFC2))
+        color = Sun50,
+        border = BorderStroke(1.dp, Sun100)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -1339,7 +1326,7 @@ fun InsightBanner(
             Icon(
                 imageVector = icon,
                 contentDescription = "Gợi ý thông minh",
-                tint = Color(0xFFC48304),
+                tint = Sun600,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))

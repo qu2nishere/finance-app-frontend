@@ -50,8 +50,8 @@ fun EditGoalScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+            .background(Ink50),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. Top Header: Back + "Sửa mục tiêu" + "Cài đặt >"
@@ -69,14 +69,14 @@ fun EditGoalScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = "Quay lại",
-                            tint = MoneyFlowTheme.colors.textPrimary
+                            tint = MoneyFlowTheme.colors.textSecondary
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Sửa mục tiêu",
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         fontFamily = FontCore,
                         color = MoneyFlowTheme.colors.textPrimary
                     )
@@ -99,7 +99,7 @@ fun EditGoalScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Color.White,
                 shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+                border = BorderStroke(1.dp, Ink100)
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -113,7 +113,7 @@ fun EditGoalScreen(
                             progress = { 0.45f },
                             modifier = Modifier.fillMaxSize(),
                             color = Grow500,
-                            trackColor = Color(0xFFF0F2F6),
+                            trackColor = Ink100,
                             strokeWidth = 6.dp
                         )
                         Text(
@@ -170,7 +170,7 @@ fun EditGoalScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Color.White,
                 shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+                border = BorderStroke(1.dp, Ink100)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Row 1: Tên mục tiêu
@@ -188,7 +188,7 @@ fun EditGoalScreen(
                         }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Row 2: Icon & màu nhãn
                     FormRow(
@@ -213,7 +213,7 @@ fun EditGoalScreen(
                         }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Row 3: Số tiền mục tiêu
                     FormRow(
@@ -230,7 +230,7 @@ fun EditGoalScreen(
                         }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Row 4: Ngày hoàn thành
                     FormRow(
@@ -247,7 +247,7 @@ fun EditGoalScreen(
                         }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Row 5: Ví tích luỹ
                     FormRow(
@@ -286,7 +286,7 @@ fun EditGoalScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Color.White,
                 shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+                border = BorderStroke(1.dp, Ink100)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Toggle 1: Tự trích mỗi tháng
@@ -305,7 +305,7 @@ fun EditGoalScreen(
                         }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Toggle 2: Hiện ở góc trang chủ
                     SettingToggleRow(
@@ -316,7 +316,7 @@ fun EditGoalScreen(
                         onCheckedChange = { isShowOnHomeEnabled = it }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Toggle 3: Nhắc nạp nếu chậm tiến độ
                     SettingToggleRow(
@@ -327,7 +327,7 @@ fun EditGoalScreen(
                         onCheckedChange = { isReminderEnabled = it }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9), modifier = Modifier.padding(vertical = 12.dp))
+                    HorizontalDivider(color = Ink100, modifier = Modifier.padding(vertical = 12.dp))
 
                     // Row 4: Thứ tự ưu tiên
                     Row(
@@ -339,7 +339,7 @@ fun EditGoalScreen(
                             Box(
                                 modifier = Modifier
                                     .size(34.dp)
-                                    .background(Color(0xFFEEF4FF), RoundedCornerShape(8.dp)),
+                                    .background(Blue50, RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -390,7 +390,7 @@ fun EditGoalScreen(
                         .clickable { },
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFC9F5DD))
+                    border = BorderStroke(1.dp, Grow100)
                 ) {
                     Row(
                         modifier = Modifier
@@ -432,7 +432,7 @@ fun EditGoalScreen(
                         .clickable { onBack() },
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFFFE0E5))
+                    border = BorderStroke(1.dp, Alert100)
                 ) {
                     Row(
                         modifier = Modifier
@@ -473,7 +473,7 @@ fun EditGoalScreen(
                         .weight(1f)
                         .height(48.dp),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, Color(0xFFDCE2EC)),
+                    border = BorderStroke(1.dp, Ink200),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.White,
                         contentColor = Ink600
@@ -529,7 +529,7 @@ fun FormRow(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(Color(0xFFEEF4FF), RoundedCornerShape(8.dp)),
+                    .background(Blue50, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -570,7 +570,7 @@ fun SettingToggleRow(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(Color(0xFFEEF4FF), RoundedCornerShape(8.dp)),
+                    .background(Blue50, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -614,7 +614,7 @@ fun SettingToggleRow(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Blue500,
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFDCE2EC),
+                uncheckedTrackColor = Ink200,
                 uncheckedBorderColor = Color.Transparent
             )
         )

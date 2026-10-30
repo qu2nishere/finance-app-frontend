@@ -30,7 +30,7 @@ import com.quan.finance_app.ui.theme.*
 @Composable
 fun MfCard(
     modifier: Modifier = Modifier,
-    borderColor: Color = MoneyFlowTheme.colors.borderSubtle,
+    borderColor: Color = MoneyFlowTheme.colors.borderCard,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
@@ -63,6 +63,29 @@ fun MfIconTile(
             tint = tint,
             modifier = Modifier.size(size * 0.53f)
         )
+    }
+}
+
+/** Header của 4 tab chính: tiêu đề luôn nằm cùng vị trí, hành động phụ ở bên phải. */
+@Composable
+fun MfTabHeader(
+    title: String,
+    trailing: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MoneyFlowTheme.typography.title1,
+            color = MoneyFlowTheme.colors.textPrimary,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        trailing()
     }
 }
 

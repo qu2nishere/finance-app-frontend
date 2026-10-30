@@ -5,6 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -98,12 +103,21 @@ fun MainApp(
 
     // Lớp phủ toàn màn — không nằm trong back stack vì chúng đóng bằng nút riêng
     var showAddSheet by remember { mutableStateOf(false) }
+    // Mở màn thêm giao dịch ở sẵn tab Thu nhập (nút "+ Thu", sửa nguồn thu)
+    var addSheetStartsWithIncome by remember { mutableStateOf(false) }
+    // Tự trích mở từ màn thêm giao dịch: phủ lên trên chứ không đóng màn đó,
+    // để back quay lại đúng màn thu với số tiền/danh mục đang nhập dở
+    var showAutoSaveOverAdd by remember { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
     var showGoalDeposit by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showDeleteData by remember { mutableStateOf(false) }
 
     fun push(route: Route) = backStack.add(route)
+    fun openAddSheet(income: Boolean = false) {
+        addSheetStartsWithIncome = income
+        showAddSheet = true
+    }
     fun pop() {
         if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
     }
@@ -157,10 +171,11 @@ fun MainApp(
 
     // Nút back của máy: đóng lớp phủ trước, sau đó mới lùi back stack
     BackHandler(
-        enabled = backStack.isNotEmpty() || showAddSheet || showScanReceipt ||
+        enabled = backStack.isNotEmpty() || showAddSheet || showAutoSaveOverAdd || showScanReceipt ||
             showGoalDeposit || showCategoryPicker || showDeleteData
     ) {
         when {
+            showAutoSaveOverAdd -> showAutoSaveOverAdd = false
             showDeleteData -> showDeleteData = false
             showCategoryPicker -> showCategoryPicker = false
             showGoalDeposit -> showGoalDeposit = false
@@ -181,20 +196,27 @@ fun MainApp(
                         selectedTab = it
                         backStack.clear()
                     },
-                    onAddClick = { showAddSheet = true }
+                    onAddClick = { openAddSheet() }
                 )
             }
         ) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                val route = backStack.lastOrNull()
+            AnimatedContent(
+                targetState = NavEntry(selectedTab, backStack.lastOrNull(), backStack.size),
+                modifier = Modifier.padding(innerPadding).fillMaxSize(),
+                transitionSpec = { screenTransition(initialState, targetState) },
+                label = "screen"
+            ) { entry ->
+              // Nền đặc để màn đang trượt không lộ màn phía dưới
+              Box(modifier = Modifier.fillMaxSize().background(MoneyFlowTheme.colors.surfacePage)) {
+                val route = entry.route
                 if (route == null) {
-                    when (selectedTab) {
+                    when (entry.tab) {
                         0 -> HomeScreen(
                             homeViewModel = homeViewModel,
                             onSeeAllTransactions = { push(Route.AllTransactions) },
                             onScanBill = { showScanReceipt = true },
-                            onAddExpense = { showAddSheet = true },
-                            onAddIncome = { showAddSheet = true },
+                            onAddExpense = { openAddSheet() },
+                            onAddIncome = { openAddSheet(income = true) },
                             onClassifyTransaction = { showCategoryPicker = true },
                             onOpenTransaction = { push(Route.TransactionDetail(it)) },
                             onOpenGoal = { push(Route.SavingsGoals) },
@@ -232,12 +254,12 @@ fun MainApp(
                         is Route.EditLimit -> EditBudgetScreen(
                             categoryName = route.category,
                             onBack = { pop() },
-                            onAddTransaction = { showAddSheet = true }
+                            onAddTransaction = { openAddSheet() }
                         )
                         is Route.EditIncomeCategory -> EditIncomeCategoryScreen(
                             categoryName = route.category,
                             onBack = { pop() },
-                            onAddTransaction = { showAddSheet = true },
+                            onAddTransaction = { openAddSheet(income = true) },
                             onOpenAutoSave = { push(Route.AutoSave) }
                         )
                         Route.AutoSave -> AutoSaveSettingScreen(onBack = { pop() })
@@ -254,7 +276,7 @@ fun MainApp(
                         is Route.TransactionDetail -> TransactionDetailScreen(
                             title = route.title,
                             onBack = { pop() },
-                            onEdit = { showAddSheet = true }
+                            onEdit = { openAddSheet() }
                         )
                         Route.Wallets -> WalletsScreen(
                             onBack = { pop() },
@@ -285,28 +307,58 @@ fun MainApp(
                         )
                     }
                 }
+              }
             }
         }
 
-        if (showAddSheet) {
+        AnimatedVisibility(
+            visible = showAddSheet,
+            enter = overlaySlideUp,
+            exit = overlaySlideDown
+        ) {
             AddTransactionScreen(
                 onDismissRequest = { showAddSheet = false },
-                onOpenAutoSave = {
-                    showAddSheet = false
-                    push(Route.AutoSave)
-                },
+                startWithIncome = addSheetStartsWithIncome,
+                onOpenAutoSave = { showAutoSaveOverAdd = true },
                 onTransactionCreated = {
                     homeViewModel.loadData()
                 }
             )
         }
-        if (showScanReceipt) {
+        AnimatedVisibility(
+            visible = showAddSheet && showAutoSaveOverAdd,
+            enter = screenPushIn,
+            exit = screenPopOut
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MoneyFlowTheme.colors.surfacePage)
+                    .systemBarsPadding()
+            ) {
+                AutoSaveSettingScreen(onBack = { showAutoSaveOverAdd = false })
+            }
+        }
+        AnimatedVisibility(
+            visible = showScanReceipt,
+            enter = overlaySlideUp,
+            exit = overlaySlideDown
+        ) {
             ScanReceiptScreen(onDismissRequest = { showScanReceipt = false })
         }
-        if (showGoalDeposit) {
+        // Hai lớp này tự vẽ scrim, nên chỉ fade + nhích nhẹ thay vì trượt cả màn
+        AnimatedVisibility(
+            visible = showGoalDeposit,
+            enter = scrimSheetIn,
+            exit = scrimSheetOut
+        ) {
             GoalDepositSheet(onDismissRequest = { showGoalDeposit = false })
         }
-        if (showDeleteData) {
+        AnimatedVisibility(
+            visible = showDeleteData,
+            enter = scrimSheetIn,
+            exit = scrimSheetOut
+        ) {
             DeleteDataDialog(
                 onDismissRequest = { showDeleteData = false },
                 onConfirm = { showDeleteData = false }
@@ -322,6 +374,51 @@ fun MainApp(
     }
 }
 
+/** Trạng thái điều hướng hiện tại — đổi giá trị này là AnimatedContent chạy transition. */
+private data class NavEntry(val tab: Int, val route: Route?, val depth: Int)
+
+// Thời lượng & easing theo Material motion: vào chậm dần, ra nhanh hơn một chút
+private const val NAV_DURATION = 320
+private val navEasing = FastOutSlowInEasing
+
+private val screenPushIn: EnterTransition =
+    slideInHorizontally(tween(NAV_DURATION, easing = navEasing)) { it } +
+        fadeIn(tween(NAV_DURATION / 2))
+private val screenPushOut: ExitTransition =
+    slideOutHorizontally(tween(NAV_DURATION, easing = navEasing)) { -it / 4 } +
+        fadeOut(tween(NAV_DURATION))
+private val screenPopIn: EnterTransition =
+    slideInHorizontally(tween(NAV_DURATION, easing = navEasing)) { -it / 4 } +
+        fadeIn(tween(NAV_DURATION))
+private val screenPopOut: ExitTransition =
+    slideOutHorizontally(tween(NAV_DURATION, easing = navEasing)) { it } +
+        fadeOut(tween(NAV_DURATION / 2, delayMillis = NAV_DURATION / 2))
+
+private val overlaySlideUp: EnterTransition =
+    slideInVertically(tween(NAV_DURATION, easing = navEasing)) { it }
+private val overlaySlideDown: ExitTransition =
+    slideOutVertically(tween(260, easing = FastOutLinearInEasing)) { it }
+
+private val scrimSheetIn: EnterTransition =
+    fadeIn(tween(220)) + slideInVertically(tween(NAV_DURATION, easing = navEasing)) { it / 10 }
+private val scrimSheetOut: ExitTransition =
+    fadeOut(tween(180)) + slideOutVertically(tween(180)) { it / 10 }
+
+/**
+ * Vào màn con: màn mới trượt từ phải đè lên. Back: màn hiện tại trượt ra phải, lộ màn cũ.
+ * Đổi tab: chỉ fade chéo, giống bottom navigation của các app phổ biến.
+ */
+private fun screenTransition(from: NavEntry, to: NavEntry): ContentTransform {
+    if (from.tab != to.tab || (from.depth == 0 && to.depth == 0)) {
+        return fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(120))
+    }
+    return if (to.depth > from.depth) {
+        (screenPushIn togetherWith screenPushOut).apply { targetContentZIndex = 1f }
+    } else {
+        (screenPopIn togetherWith screenPopOut).apply { targetContentZIndex = -1f }
+    }
+}
+
 @Composable
 fun CustomBottomNav(
     selectedTab: Int,
@@ -329,14 +426,18 @@ fun CustomBottomNav(
     onAddClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().height(80.dp),
+        modifier = Modifier.fillMaxWidth(),
         color = MoneyFlowTheme.colors.surfaceCard,
         shadowElevation = 16.dp,
         tonalElevation = 0.dp,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(72.dp)
+                .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {

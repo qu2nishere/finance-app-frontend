@@ -6,27 +6,35 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.quan.finance_app.data.remote.WalletDto
 import com.quan.finance_app.ui.components.core.SkeletonBox
 import com.quan.finance_app.ui.theme.FontMono
@@ -59,49 +67,17 @@ fun WalletPickerSheet(
                 .fillMaxWidth()
                 .padding(horizontal = MoneyFlowTheme.spacing.gutterScreen, vertical = 12.dp)
         ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Chọn ví",
-                        style = MoneyFlowTheme.typography.title2,
-                        color = MoneyFlowTheme.colors.textPrimary
-                    )
-                    Text(
-                        text = "Chọn ví nguồn tiền cho giao dịch",
-                        style = MoneyFlowTheme.typography.caption,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
-                }
-
-                if (onAddWallet != null) {
-                    OutlinedButton(
-                        onClick = { showAddDialog = true },
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        border = BorderStroke(1.dp, MoneyFlowTheme.colors.surfaceBrand),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MoneyFlowTheme.colors.surfaceBrand
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Thêm ví",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Thêm mới",
-                            style = MoneyFlowTheme.typography.caption,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
+            // Header — nút thêm ví chỉ nằm ở cuối danh sách, không lặp lại ở đây
+            Text(
+                text = "Chọn ví",
+                style = MoneyFlowTheme.typography.title2,
+                color = MoneyFlowTheme.colors.textPrimary
+            )
+            Text(
+                text = "Chọn ví nguồn tiền cho giao dịch",
+                style = MoneyFlowTheme.typography.caption,
+                color = MoneyFlowTheme.colors.textSecondary
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -291,142 +267,260 @@ fun WalletPickerSheet(
         }
     }
 
-    // Dialog tạo ví mới
     if (showAddDialog) {
-        var walletName by remember { mutableStateOf("") }
-        var selectedKind by remember { mutableStateOf("CASH") }
-        var initialBalanceStr by remember { mutableStateOf("") }
-        var isNameError by remember { mutableStateOf(false) }
-
-        val kinds = listOf(
-            "CASH" to "Tiền mặt",
-            "BANK" to "Ngân hàng",
-            "EWALLET" to "Ví điện tử",
-            "CREDIT_CARD" to "Thẻ tín dụng"
-        )
-
-        AlertDialog(
+        AddWalletDialog(
             onDismissRequest = { showAddDialog = false },
-            title = {
-                Text(
-                    text = "Thêm ví mới",
-                    style = MoneyFlowTheme.typography.title3,
-                    fontWeight = FontWeight.Bold,
-                    color = MoneyFlowTheme.colors.textPrimary
-                )
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Tên ví:",
-                        style = MoneyFlowTheme.typography.caption,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = walletName,
-                        onValueChange = {
-                            walletName = it
-                            isNameError = false
-                        },
-                        placeholder = { Text("VD: Ví chính, Vietcombank, Momo...") },
-                        isError = isNameError,
-                        supportingText = if (isNameError) {
-                            { Text("Tên ví không được để trống") }
-                        } else null,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+            onConfirm = { name, kind, initialBalance ->
+                onAddWallet?.invoke(name, kind, initialBalance)
+                showAddDialog = false
+                onDismissRequest()
+            }
+        )
+    }
+}
 
-                    Spacer(modifier = Modifier.height(14.dp))
+/** Các loại ví khớp với enum WalletKind ở ledger-service. */
+private val addableWalletKinds = listOf("CASH", "BANK", "EWALLET", "CREDIT_CARD", "SAVINGS", "INVESTMENT")
 
-                    Text(
-                        text = "Loại ví:",
-                        style = MoneyFlowTheme.typography.caption,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+private fun walletNameHint(kind: String): String = when (kind) {
+    "BANK" -> "VD: Vietcombank, Techcombank..."
+    "EWALLET" -> "VD: Momo, ZaloPay..."
+    "CREDIT_CARD" -> "VD: Thẻ VIB, Thẻ TPBank..."
+    "SAVINGS" -> "VD: Quỹ dự phòng, Sổ tiết kiệm..."
+    "INVESTMENT" -> "VD: Chứng khoán, Vàng..."
+    else -> "VD: Ví chính, Tiền mặt..."
+}
+
+@Composable
+private fun AddWalletDialog(
+    onDismissRequest: () -> Unit,
+    onConfirm: (name: String, kind: String, initialBalance: Long) -> Unit
+) {
+    var walletName by remember { mutableStateOf("") }
+    var selectedKind by remember { mutableStateOf("CASH") }
+    // Giữ dạng đã chia nhóm "1.500.000" và đặt con trỏ ở cuối sau mỗi lần gõ
+    var balanceField by remember { mutableStateOf(TextFieldValue("")) }
+    val balance = balanceField.text.filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val nameFocus = remember { FocusRequester() }
+    val canSubmit = walletName.isNotBlank()
+    val brand = MoneyFlowTheme.colors.surfaceBrand
+
+    fun submit() {
+        if (canSubmit) onConfirm(walletName.trim(), selectedKind, balance)
+    }
+
+    LaunchedEffect(Unit) { nameFocus.requestFocus() }
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MoneyFlowTheme.colors.surfaceCard,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                // Header: icon theo loại ví + tiêu đề + nút đóng
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(brand),
+                        contentAlignment = Alignment.Center
                     ) {
-                        items(kinds) { (kindKey, kindTitle) ->
-                            val isKindSelected = selectedKind == kindKey
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(
-                                        if (isKindSelected) MoneyFlowTheme.colors.surfaceBrand
-                                        else MoneyFlowTheme.colors.surfacePage
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isKindSelected) MoneyFlowTheme.colors.surfaceBrand else MoneyFlowTheme.colors.borderSubtle,
-                                        RoundedCornerShape(16.dp)
-                                    )
-                                    .clickable { selectedKind = kindKey }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = kindTitle,
-                                    style = MoneyFlowTheme.typography.caption,
-                                    fontWeight = if (isKindSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isKindSelected) Color.White else MoneyFlowTheme.colors.textPrimary
+                        Icon(
+                            getWalletKindIcon(selectedKind),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Thêm ví mới",
+                            style = MoneyFlowTheme.typography.title3,
+                            fontWeight = FontWeight.Bold,
+                            color = MoneyFlowTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = getWalletKindLabel(selectedKind),
+                            style = MoneyFlowTheme.typography.caption,
+                            color = MoneyFlowTheme.colors.textSecondary
+                        )
+                    }
+                    IconButton(onClick = onDismissRequest, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Đóng",
+                            tint = MoneyFlowTheme.colors.textSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                AddWalletLabel("LOẠI VÍ")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    addableWalletKinds.chunked(3).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { kind ->
+                                WalletKindOption(
+                                    kind = kind,
+                                    selected = kind == selectedKind,
+                                    onClick = { selectedKind = kind },
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Text(
-                        text = "Số dư ban đầu (₫):",
-                        style = MoneyFlowTheme.typography.caption,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = initialBalanceStr,
-                        onValueChange = { initialBalanceStr = it.filter { char -> char.isDigit() } },
-                        placeholder = { Text("0") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val trimmed = walletName.trim()
-                        if (trimmed.isNotBlank()) {
-                            val balance = initialBalanceStr.toLongOrNull() ?: 0L
-                            onAddWallet?.invoke(trimmed, selectedKind, balance)
-                            showAddDialog = false
-                            onDismissRequest()
-                        } else {
-                            isNameError = true
-                        }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                AddWalletLabel("TÊN VÍ")
+                OutlinedTextField(
+                    value = walletName,
+                    onValueChange = { walletName = it.take(50) },
+                    placeholder = { Text(walletNameHint(selectedKind)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Next
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(nameFocus),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                AddWalletLabel("SỐ DƯ BAN ĐẦU")
+                OutlinedTextField(
+                    value = balanceField,
+                    onValueChange = { input ->
+                        val digits = input.text.filter { it.isDigit() }.trimStart('0').take(12)
+                        val grouped = if (digits.isEmpty()) "" else groupDigits(digits.toLong())
+                        balanceField = TextFieldValue(grouped, TextRange(grouped.length))
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MoneyFlowTheme.colors.surfaceBrand),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Tạo ví", color = Color.White, fontWeight = FontWeight.Bold)
+                    placeholder = { Text("0", fontFamily = FontMono) },
+                    suffix = { Text("₫", fontWeight = FontWeight.SemiBold) },
+                    textStyle = LocalTextStyle.current.copy(
+                        fontFamily = FontMono,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(100_000L, 500_000L, 1_000_000L).forEach { step ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(brand.copy(alpha = 0.08f))
+                                .clickable {
+                                    val grouped = groupDigits((balance + step).coerceAtMost(999_999_999_999L))
+                                    balanceField = TextFieldValue(grouped, TextRange(grouped.length))
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "+" + groupDigits(step),
+                                style = MoneyFlowTheme.typography.caption,
+                                fontWeight = FontWeight.SemiBold,
+                                color = brand
+                            )
+                        }
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("Huỷ", color = MoneyFlowTheme.colors.textSecondary)
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onDismissRequest,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MoneyFlowTheme.colors.borderSubtle)
+                    ) {
+                        Text("Huỷ", color = MoneyFlowTheme.colors.textSecondary)
+                    }
+                    Button(
+                        onClick = { submit() },
+                        enabled = canSubmit,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = brand)
+                    ) {
+                        Text("Tạo ví", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            containerColor = MoneyFlowTheme.colors.surfaceCard,
-            shape = RoundedCornerShape(20.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddWalletLabel(text: String) {
+    Text(
+        text = text,
+        style = MoneyFlowTheme.typography.caption,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.8.sp,
+        color = MoneyFlowTheme.colors.textSecondary,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun WalletKindOption(
+    kind: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val brand = MoneyFlowTheme.colors.surfaceBrand
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) brand.copy(alpha = 0.08f) else MoneyFlowTheme.colors.surfacePage)
+            .border(
+                BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) brand else MoneyFlowTheme.colors.borderSubtle),
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            getWalletKindIcon(kind),
+            contentDescription = null,
+            tint = if (selected) brand else MoneyFlowTheme.colors.textSecondary,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = getWalletKindLabel(kind),
+            style = MoneyFlowTheme.typography.caption,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) brand else MoneyFlowTheme.colors.textPrimary,
+            maxLines = 1
         )
     }
 }
+
 
 fun getWalletKindIcon(kind: String?): ImageVector {
     return when (kind?.uppercase()) {

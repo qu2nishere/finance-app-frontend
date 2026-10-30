@@ -50,6 +50,7 @@ import java.util.Locale
 @Composable
 fun AddTransactionScreen(
     onDismissRequest: () -> Unit,
+    startWithIncome: Boolean = false,
     onOpenAutoSave: () -> Unit = {},
     transactionViewModel: TransactionViewModel = viewModel(),
     onTransactionCreated: () -> Unit = {},
@@ -57,7 +58,10 @@ fun AddTransactionScreen(
 ) {
     val uiState by transactionViewModel.state.collectAsState()
 
-    var isExpense by remember { mutableStateOf(true) }
+    var isExpense by remember { mutableStateOf(!startWithIncome) }
+    // ViewModel sống theo Activity nên còn giữ loại thu/chi của lần mở trước —
+    // đồng bộ lại mỗi lần mở để giao diện và dữ liệu gửi lên luôn khớp nhau
+    LaunchedEffect(Unit) { transactionViewModel.setExpense(!startWithIncome) }
     var autoSaveEnabled by remember { mutableStateOf(true) }
     var autoSavePercent by remember { mutableIntStateOf(20) }
     var expression by remember { mutableStateOf("") }

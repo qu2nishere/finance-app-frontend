@@ -2,6 +2,7 @@ package com.quan.finance_app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -29,9 +31,8 @@ import com.quan.finance_app.data.remote.TransactionDto
 import com.quan.finance_app.ui.components.core.DashboardBalanceCardSkeleton
 import com.quan.finance_app.ui.components.core.DashboardTransactionsSkeleton
 import com.quan.finance_app.ui.home.HomeViewModel
-import com.quan.finance_app.ui.theme.FontCore
-import com.quan.finance_app.ui.theme.FontMono
-import com.quan.finance_app.ui.theme.MoneyFlowTheme
+import com.quan.finance_app.ui.components.core.MfTabHeader
+import com.quan.finance_app.ui.theme.*
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -53,9 +54,9 @@ fun HomeScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentPadding = PaddingValues(top = 24.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .background(Ink50),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // 1. Header
         item {
@@ -108,48 +109,43 @@ fun DashboardHeader(
     onOpenGoal: () -> Unit = {},
     onOpenNotifications: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text("XIN CHÀO", style = MoneyFlowTheme.typography.micro, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontCore)
-            Text("Minh", fontSize = 28.sp, color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = FontCore)
+    MfTabHeader(title = "Chào Minh") {
+        // Mục tiêu đang theo dõi
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color.White)
+                .border(1.dp, MoneyFlowTheme.colors.borderCard, RoundedCornerShape(24.dp))
+                .clickable(onClick = onOpenGoal)
+                .padding(start = 6.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(Sun100, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🏝️", fontSize = 14.sp)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text("Đà Lạt", style = MoneyFlowTheme.typography.caption, fontWeight = FontWeight.SemiBold, color = MoneyFlowTheme.colors.textPrimary)
+                Text("4.5/10tr", fontSize = 11.sp, lineHeight = 14.sp, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontMono)
+            }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            // Budget Pill
-            Row(
-                modifier = Modifier
-                    .background(Color.White, RoundedCornerShape(32.dp))
-                    .clickable(onClick = onOpenGoal)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFFFFE0B2), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🏝️", fontSize = 16.sp)
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text("Đà Lạt", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MoneyFlowTheme.colors.textPrimary, fontFamily = FontCore)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text("4.5/10tr", fontSize = 12.sp, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontMono)
-                }
-            }
-            // Notification Bell
-            IconButton(
-                onClick = onOpenNotifications,
-                modifier = Modifier
-                    .size(52.dp)
-                    .background(Color.White, CircleShape)
-            ) {
-                Icon(Icons.Outlined.Notifications, contentDescription = "Thông báo", tint = MoneyFlowTheme.colors.textPrimary, modifier = Modifier.size(28.dp))
-            }
+        Spacer(modifier = Modifier.width(8.dp))
+        // Box thay vì IconButton: IconButton luôn chiếm tối thiểu 48dp nên lấn ra ngoài lề
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+                .border(1.dp, MoneyFlowTheme.colors.borderCard, CircleShape)
+                .clickable(onClick = onOpenNotifications),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.Notifications, contentDescription = "Thông báo", tint = MoneyFlowTheme.colors.textSecondary, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -164,29 +160,29 @@ fun DashboardBalanceCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
-        shadowElevation = 8.dp,
-        tonalElevation = 0.dp
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MoneyFlowTheme.colors.borderCard)
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text("Số dư hiện tại", fontSize = 14.sp, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontCore)
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = formatter.format(totalBalance),
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MoneyFlowTheme.colors.textPrimary,
-                    letterSpacing = (-1).sp,
+                    letterSpacing = (-0.5).sp,
                     fontFamily = FontMono
                 )
                 Text(
-                    text = " ₫",
+                    text = "₫",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = MoneyFlowTheme.colors.textPrimary,
-                    modifier = Modifier.padding(bottom = 6.dp),
+                    modifier = Modifier.padding(bottom = 3.dp, start = 1.dp),
                     fontFamily = FontCore
                 )
             }
@@ -206,7 +202,7 @@ fun DashboardBalanceCard(
                             .weight(1f)
                             .fillMaxHeight(fraction)
                             .background(
-                                color = if (isProminent) MoneyFlowTheme.colors.surfaceBrand else Color(0xFFE3EDFF),
+                                color = if (isProminent) MoneyFlowTheme.colors.surfaceBrand else Blue100,
                                 shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
                             )
                     )
@@ -214,7 +210,7 @@ fun DashboardBalanceCard(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            HorizontalDivider(color = Color(0xFFF0F0F0))
+            HorizontalDivider(color = Ink100)
             Spacer(modifier = Modifier.height(16.dp))
 
             // Bottom row: Thu - Chi trong tháng
@@ -223,7 +219,7 @@ fun DashboardBalanceCard(
                     Text("Thu ", color = MoneyFlowTheme.colors.textSecondary, fontSize = 14.sp, fontFamily = FontCore)
                     Text(
                         "+" + formatter.format(monthIncome) + "₫",
-                        color = Color(0xFF4CAF50),
+                        color = MoneyFlowTheme.colors.flowIn,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontMono
@@ -232,8 +228,8 @@ fun DashboardBalanceCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Chi ", color = MoneyFlowTheme.colors.textSecondary, fontSize = 14.sp, fontFamily = FontCore)
                     Text(
-                        "-" + formatter.format(monthExpense) + "₫",
-                        color = MoneyFlowTheme.colors.surfaceBrand,
+                        "−" + formatter.format(monthExpense) + "₫",
+                        color = MoneyFlowTheme.colors.flowOut,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontMono
@@ -275,7 +271,7 @@ fun DashboardActionButtons(
             onClick = onScanBill,
             modifier = Modifier.weight(1f).height(48.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MoneyFlowTheme.colors.textSecondary),
-            border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+            border = BorderStroke(1.dp, Ink200),
             shape = RoundedCornerShape(12.dp)
         ) {
             Text("Quét bill", color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = FontCore)
@@ -298,11 +294,11 @@ fun DashboardTransactions(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Giao dịch gần đây", style = MoneyFlowTheme.typography.title3, color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = FontCore)
+            Text("Giao dịch gần đây", fontSize = 18.sp, color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = FontCore)
             Text(
                 "Tất cả >",
-                style = MoneyFlowTheme.typography.body,
-                color = MoneyFlowTheme.colors.surfaceBrand,
+                fontSize = 14.sp,
+                color = MoneyFlowTheme.colors.textBrand,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = FontCore,
                 modifier = Modifier.clickable(onClick = onSeeAll)
@@ -312,9 +308,10 @@ fun DashboardTransactions(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(20.dp),
             color = Color.White,
-            shadowElevation = 4.dp
+            shadowElevation = 2.dp,
+            border = BorderStroke(1.dp, MoneyFlowTheme.colors.borderCard)
         ) {
             if (transactions.isEmpty()) {
                 Box(
@@ -334,8 +331,8 @@ fun DashboardTransactions(
                 Column {
                     transactions.forEachIndexed { index, txn ->
                         val isIncome = txn.type == "INCOME"
-                        val amountText = (if (isIncome) "+" else "-") + formatter.format(txn.amount) + " ₫"
-                        val amountColor = if (isIncome) Color(0xFF4CAF50) else MoneyFlowTheme.colors.textPrimary
+                        val amountText = (if (isIncome) "+" else "−") + formatter.format(txn.amount) + "₫"
+                        val amountColor = if (isIncome) Grow600 else MoneyFlowTheme.colors.textPrimary
                         val icon = getCategoryIcon(txn.categoryName)
                         val title = txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch"
                         val subtitle = (txn.categoryName ?: "Chưa phân loại") +
@@ -344,8 +341,8 @@ fun DashboardTransactions(
 
                         TransactionItem(
                             icon = icon,
-                            iconBg = if (isIncome) Color(0xFFE8F5E9) else Color(0xFFE3EDFF),
-                            iconTint = if (isIncome) Color(0xFF4CAF50) else MoneyFlowTheme.colors.surfaceBrand,
+                            iconBg = if (isIncome) Grow50 else Heat50,
+                            iconTint = if (isIncome) Grow600 else Heat600,
                             title = title,
                             subtitle = subtitle,
                             amount = amountText,
@@ -356,7 +353,7 @@ fun DashboardTransactions(
                         )
 
                         if (index < transactions.lastIndex) {
-                            HorizontalDivider(color = Color(0xFFF0F0F0), modifier = Modifier.padding(horizontal = 24.dp))
+                            HorizontalDivider(color = Ink100, modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
                 }
@@ -382,20 +379,20 @@ fun TransactionItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .background(iconBg, RoundedCornerShape(12.dp)),
+                .size(34.dp)
+                .background(iconBg, RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MoneyFlowTheme.typography.body, color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.Bold, fontFamily = FontCore)
+            Text(title, style = MoneyFlowTheme.typography.body, color = MoneyFlowTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold, fontFamily = FontCore)
             Spacer(modifier = Modifier.height(2.dp))
             Text(subtitle, style = MoneyFlowTheme.typography.caption, color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontCore)
         }
@@ -405,7 +402,7 @@ fun TransactionItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier
-                        .background(Color(0xFFE3EDFF), RoundedCornerShape(12.dp))
+                        .background(Blue100, RoundedCornerShape(12.dp))
                         .clickable(onClick = onClassify)
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {

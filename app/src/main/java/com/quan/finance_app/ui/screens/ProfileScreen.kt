@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quan.finance_app.ui.components.core.MfSectionLabel
+import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.theme.*
 
 @Composable
@@ -42,19 +44,15 @@ fun ProfileScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+            .background(Ink50),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. Header: "Cài đặt"
         item {
-            Text(
-                text = "Cài đặt",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontCore,
-                color = MoneyFlowTheme.colors.textPrimary
-            )
+            Box(modifier = Modifier.padding(bottom = 4.dp)) {
+                MfTabHeader(title = "Cài đặt")
+            }
         }
 
         // 2. User Profile Card
@@ -77,7 +75,7 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Color.White,
                 shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+                border = BorderStroke(1.dp, Ink100)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     // Danh mục và Hạn mức
@@ -88,7 +86,7 @@ fun ProfileScreen(
                         onClick = onNavigateToCategories
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Ví & tài khoản
                     SettingNavigationRow(
@@ -98,7 +96,7 @@ fun ProfileScreen(
                         onClick = onNavigateToWallets
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Giao dịch định kỳ
                     SettingNavigationRow(
@@ -108,7 +106,7 @@ fun ProfileScreen(
                         onClick = onNavigateToRecurring
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Mục tiêu tiết kiệm
                     SettingNavigationRow(
@@ -118,7 +116,7 @@ fun ProfileScreen(
                         onClick = onNavigateToSavingsGoals
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Tự trích thu nhập
                     SettingNavigationRow(
@@ -130,7 +128,7 @@ fun ProfileScreen(
                         onClick = onNavigateToAutoSave
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Đơn vị tiền tệ
                     SettingNavigationRow(
@@ -154,7 +152,7 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Color.White,
                 shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+                border = BorderStroke(1.dp, Ink100)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     // Thông báo & nhắc nhở — gom mọi loại thông báo vào màn riêng (9e)
@@ -166,7 +164,7 @@ fun ProfileScreen(
                         onClick = onNavigateToNotificationSettings
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Chế độ tối
                     SettingToggleItem(
@@ -177,7 +175,7 @@ fun ProfileScreen(
                         onCheckedChange = { isDarkModeEnabled = it }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Khoá bằng Face ID / PIN
                     SettingToggleItem(
@@ -188,7 +186,7 @@ fun ProfileScreen(
                         onCheckedChange = { isBiometricLockEnabled = it }
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Ngôn ngữ
                     SettingNavigationRow(
@@ -212,7 +210,7 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(20.dp),
                 color = Color.White,
                 shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+                border = BorderStroke(1.dp, Ink100)
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     // Xuất Excel / CSV
@@ -223,7 +221,7 @@ fun ProfileScreen(
                         onClick = onNavigateToExport
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Sao lưu & đồng bộ
                     SettingNavigationRow(
@@ -234,12 +232,12 @@ fun ProfileScreen(
                         onClick = onNavigateToBackup
                     )
 
-                    HorizontalDivider(color = Color(0xFFF4F6F9))
+                    HorizontalDivider(color = Ink100)
 
                     // Xoá toàn bộ dữ liệu
                     SettingNavigationRow(
                         icon = Icons.Outlined.DeleteOutline,
-                        iconBg = Color(0xFFFFF0F2),
+                        iconBg = Alert50,
                         iconTint = Alert500,
                         title = "Xoá toàn bộ dữ liệu",
                         titleColor = Alert500,
@@ -258,14 +256,9 @@ fun ProfileScreen(
 
 @Composable
 fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        fontFamily = FontCore,
-        color = MoneyFlowTheme.colors.textSecondary,
-        modifier = Modifier.padding(top = 6.dp)
-    )
+    Box(modifier = Modifier.padding(top = 6.dp)) {
+        MfSectionLabel(text = title)
+    }
 }
 
 @Composable
@@ -278,10 +271,10 @@ fun UserProfileCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -291,7 +284,7 @@ fun UserProfileCard(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color(0xFFFFEDE6), CircleShape),
+                    .background(Heat50, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -334,7 +327,7 @@ fun UserProfileCard(
 @Composable
 fun SettingNavigationRow(
     icon: ImageVector,
-    iconBg: Color = Color(0xFFEEF4FF),
+    iconBg: Color = Blue50,
     iconTint: Color = Blue500,
     title: String,
     subtitle: String? = null,
@@ -355,7 +348,7 @@ fun SettingNavigationRow(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(iconBg, RoundedCornerShape(8.dp)),
+                    .background(iconBg, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -409,7 +402,7 @@ fun SettingNavigationRow(
 @Composable
 fun SettingToggleItem(
     icon: ImageVector,
-    iconBg: Color = Color(0xFFEEF4FF),
+    iconBg: Color = Blue50,
     iconTint: Color = Blue500,
     title: String,
     subtitle: String? = null,
@@ -427,7 +420,7 @@ fun SettingToggleItem(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(iconBg, RoundedCornerShape(8.dp)),
+                    .background(iconBg, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -465,7 +458,7 @@ fun SettingToggleItem(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Blue500,
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFDCE2EC),
+                uncheckedTrackColor = Ink200,
                 uncheckedBorderColor = Color.Transparent
             )
         )

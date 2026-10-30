@@ -63,7 +63,7 @@ fun DashboardBalanceCardSkeleton(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(Color.White)
             .padding(24.dp)
     ) {

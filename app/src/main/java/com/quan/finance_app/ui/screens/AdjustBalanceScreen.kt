@@ -37,7 +37,7 @@ fun AdjustBalanceScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MoneyFlowTheme.colors.surfacePage),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item { MfScreenHeader(title = "Điều chỉnh số dư", onBack = onBack) }
