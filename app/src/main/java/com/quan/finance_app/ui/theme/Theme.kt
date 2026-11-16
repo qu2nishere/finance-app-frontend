@@ -28,6 +28,7 @@ data class MoneyFlowColors(
     val surfaceInSoft: Color = Grow50,
     val surfaceOverlay: Color = Color(0x8F0A1220), // rgba(10,18,32,.56)
 
+    val borderCard: Color = Ink100,
     val borderSubtle: Color = Ink200,
     val borderDefault: Color = Ink300,
     val borderStrong: Color = Ink400,

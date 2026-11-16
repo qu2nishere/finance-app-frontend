@@ -30,13 +30,14 @@ import com.quan.finance_app.ui.theme.*
 fun SavingsGoalsScreen(
     onBack: () -> Unit = {},
     onNavigateToEditGoal: () -> Unit = {},
+    onDeposit: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+            .background(Ink50),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // 1. Top Header with Back button and "+ Thêm"
@@ -54,14 +55,14 @@ fun SavingsGoalsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = "Quay lại",
-                            tint = MoneyFlowTheme.colors.textPrimary
+                            tint = MoneyFlowTheme.colors.textSecondary
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Mục tiêu tiết kiệm",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         fontFamily = FontCore,
                         color = MoneyFlowTheme.colors.textPrimary
                     )
@@ -70,7 +71,7 @@ fun SavingsGoalsScreen(
                 Surface(
                     modifier = Modifier.clickable { onNavigateToEditGoal() },
                     shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFFEEF4FF)
+                    color = Blue50
                 ) {
                     Text(
                         text = "+ Thêm",
@@ -107,7 +108,7 @@ fun SavingsGoalsScreen(
                 // Goal 1: Du lịch Đà Lạt (45%)
                 ActiveGoalCard(
                     icon = Icons.Outlined.CardGiftcard,
-                    iconBg = Color(0xFFE8F8F0),
+                    iconBg = Grow50,
                     iconTint = Grow500,
                     title = "Du lịch Đà Lạt",
                     spentAmount = "4,5tr",
@@ -115,13 +116,14 @@ fun SavingsGoalsScreen(
                     subInfo = "Cần 1,4tr/tháng · hạn 12/2026",
                     progress = 0.45f,
                     progressColor = Grow500,
-                    onClick = onNavigateToEditGoal
+                    onClick = onNavigateToEditGoal,
+                    onDeposit = onDeposit
                 )
 
                 // Goal 2: Quỹ dự phòng (22%)
                 ActiveGoalCard(
                     icon = Icons.Outlined.Shield,
-                    iconBg = Color(0xFFE8F8F0),
+                    iconBg = Grow50,
                     iconTint = Grow500,
                     title = "Quỹ dự phòng",
                     spentAmount = "11,0tr",
@@ -129,13 +131,14 @@ fun SavingsGoalsScreen(
                     subInfo = "Tự trích 3,6tr/tháng · hạn 06/2027",
                     progress = 0.22f,
                     progressColor = Grow500,
-                    onClick = onNavigateToEditGoal
+                    onClick = onNavigateToEditGoal,
+                    onDeposit = onDeposit
                 )
 
                 // Goal 3: Đổi điện thoại (25% - Chậm tiến độ)
                 ActiveGoalCard(
                     icon = Icons.Outlined.PhoneIphone,
-                    iconBg = Color(0xFFFFF8E6),
+                    iconBg = Sun50,
                     iconTint = Sun500,
                     title = "Đổi điện thoại",
                     spentAmount = "3,0tr",
@@ -144,7 +147,8 @@ fun SavingsGoalsScreen(
                     subInfoColor = Heat500,
                     progress = 0.25f,
                     progressColor = Sun500,
-                    onClick = onNavigateToEditGoal
+                    onClick = onNavigateToEditGoal,
+                    onDeposit = onDeposit
                 )
             }
         }
@@ -174,8 +178,8 @@ fun SavingsGoalsScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFFFFF8E6),
-                border = BorderStroke(1.dp, Color(0xFFFFEFC2))
+                color = Sun50,
+                border = BorderStroke(1.dp, Sun100)
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -184,25 +188,25 @@ fun SavingsGoalsScreen(
                     Icon(
                         imageVector = Icons.Outlined.Info,
                         contentDescription = "Gợi ý thông minh",
-                        tint = Color(0xFFC48304),
+                        tint = Sun600,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append("Còn dư ")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF2C220E), fontWeight = FontWeight.Bold, fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink900, fontWeight = FontWeight.Bold, fontFamily = FontCore)) {
                                 append("2,3tr")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append(" tháng này — nạp thêm vào ")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF2C220E), fontWeight = FontWeight.Bold, fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink900, fontWeight = FontWeight.Bold, fontFamily = FontCore)) {
                                 append("“Du lịch Đà Lạt”")
                             }
-                            withStyle(SpanStyle(color = Color(0xFF4A3B18), fontFamily = FontCore)) {
+                            withStyle(SpanStyle(color = Ink700, fontFamily = FontCore)) {
                                 append(" để về đích sớm 1 tháng?")
                             }
                         },
@@ -222,10 +226,10 @@ fun SavingsGoalsScreen(
 fun TotalAccumulatedCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -241,7 +245,7 @@ fun TotalAccumulatedCard() {
                         progress = { 0.31f },
                         modifier = Modifier.fillMaxSize(),
                         color = Grow500,
-                        trackColor = Color(0xFFE8F8F0),
+                        trackColor = Grow50,
                         strokeWidth = 7.dp
                     )
                     Text(
@@ -320,7 +324,8 @@ fun ActiveGoalCard(
     subInfoColor: Color = MoneyFlowTheme.colors.textSecondary,
     progress: Float,
     progressColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeposit: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -329,7 +334,7 @@ fun ActiveGoalCard(
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -344,7 +349,7 @@ fun ActiveGoalCard(
                     progress = { progress },
                     modifier = Modifier.fillMaxSize(),
                     color = progressColor,
-                    trackColor = Color(0xFFF0F2F6),
+                    trackColor = Ink100,
                     strokeWidth = 5.dp
                 )
                 Text(
@@ -410,9 +415,11 @@ fun ActiveGoalCard(
 
             // Plus Action Button
             Surface(
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(onClick = onDeposit),
                 shape = RoundedCornerShape(10.dp),
-                color = Color(0xFFFFF0EC)
+                color = Heat50
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -437,7 +444,7 @@ fun CompletedGoalCard(
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -448,7 +455,7 @@ fun CompletedGoalCard(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(Color(0xFFE8F8F0), RoundedCornerShape(10.dp)),
+                        .background(Grow50, RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

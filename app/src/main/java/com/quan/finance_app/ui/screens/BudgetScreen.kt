@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.theme.*
 
 @Composable
@@ -35,8 +36,8 @@ fun BudgetScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F9FC)),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp, start = 20.dp, end = 20.dp),
+            .background(Ink50),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // 1. Top Header: Title "Ngân sách" + "+ Thêm" Button
@@ -69,14 +70,14 @@ fun BudgetScreen(
                 // Card 1: Ăn uống (Vượt hạn mức - Alert Red)
                 CategoryBudgetCard(
                     icon = Icons.Outlined.Storefront,
-                    iconBg = Color(0xFFFFF0F2),
-                    iconTint = Color(0xFFE11D48),
+                    iconBg = Alert50,
+                    iconTint = Alert500,
                     title = "Ăn uống",
                     spentAmount = "3,3tr",
                     limitAmount = "3,0tr",
                     progress = 1.0f,
-                    progressColor = Color(0xFFE11D48),
-                    borderColor = Color(0xFFFFB4C0),
+                    progressColor = Alert500,
+                    borderColor = Alert300,
                     isOverBudget = true,
                     overAmount = "302.000₫"
                 )
@@ -84,14 +85,14 @@ fun BudgetScreen(
                 // Card 2: Di chuyển (Bình thường - Orange)
                 CategoryBudgetCard(
                     icon = Icons.Outlined.DirectionsCar,
-                    iconBg = Color(0xFFEEF4FF),
+                    iconBg = Blue50,
                     iconTint = Blue500,
                     title = "Di chuyển",
                     spentAmount = "2,0tr",
                     limitAmount = "2,5tr",
                     progress = 0.80f,
                     progressColor = Heat500,
-                    borderColor = Color(0xFFF0F3F8),
+                    borderColor = Ink100,
                     isOverBudget = false
                 )
 
@@ -99,13 +100,13 @@ fun BudgetScreen(
                 CategoryBudgetCard(
                     icon = Icons.Outlined.ShoppingBag,
                     iconBg = Color(0xFFF2F0FF),
-                    iconTint = Color(0xFF7A5CF0),
+                    iconTint = CatBills,
                     title = "Mua sắm",
                     spentAmount = "1,5tr",
                     limitAmount = "2,0tr",
                     progress = 0.75f,
                     progressColor = Heat500,
-                    borderColor = Color(0xFFF0F3F8),
+                    borderColor = Ink100,
                     isOverBudget = false
                 )
 
@@ -116,8 +117,8 @@ fun BudgetScreen(
                         .height(48.dp)
                         .clickable { /* Add new category budget */ },
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFF4F7FF),
-                    border = BorderStroke(1.dp, Color(0xFFD6E4FF))
+                    color = Blue50,
+                    border = BorderStroke(1.dp, Blue100)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -175,7 +176,7 @@ fun BudgetScreen(
                         .weight(1f)
                         .clickable { onNavigateToSavingsGoals() },
                     icon = Icons.Outlined.CardGiftcard,
-                    iconBg = Color(0xFFE8F8F0),
+                    iconBg = Grow50,
                     iconTint = Grow500,
                     title = "Du lịch Đà Lạt",
                     progress = 0.45f,
@@ -189,7 +190,7 @@ fun BudgetScreen(
                         .weight(1f)
                         .clickable { onNavigateToSavingsGoals() },
                     icon = Icons.Outlined.Shield,
-                    iconBg = Color(0xFFF0F4F8),
+                    iconBg = Ink100,
                     iconTint = Ink600,
                     title = "Quỹ dự phòng",
                     progress = 0.22f,
@@ -207,24 +208,11 @@ fun BudgetScreen(
 
 @Composable
 fun BudgetHeader(onAddClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Ngân sách",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontCore,
-            color = MoneyFlowTheme.colors.textPrimary
-        )
-
+    MfTabHeader(title = "Ngân sách") {
         Surface(
-            modifier = Modifier
-                .clickable(onClick = onAddClick),
+            modifier = Modifier.clickable(onClick = onAddClick),
             shape = RoundedCornerShape(20.dp),
-            color = Color(0xFFEEF4FF)
+            color = Blue50
         ) {
             Text(
                 text = "+ Thêm",
@@ -242,10 +230,10 @@ fun BudgetHeader(onAddClick: () -> Unit) {
 fun TotalMonthlyBudgetCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -294,14 +282,14 @@ fun TotalMonthlyBudgetCard() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(10.dp)
-                    .background(Color(0xFFF0F2F6), RoundedCornerShape(5.dp))
+                    .height(8.dp)
+                    .background(Ink100, RoundedCornerShape(4.dp))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(fraction = 0.81f)
                         .fillMaxHeight()
-                        .background(Heat500, RoundedCornerShape(5.dp))
+                        .background(Heat500, RoundedCornerShape(4.dp))
                 )
             }
 
@@ -361,7 +349,7 @@ fun CategoryBudgetCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(34.dp)
                             .background(iconBg, RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -397,7 +385,7 @@ fun CategoryBudgetCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
-                    .background(Color(0xFFF0F2F6), RoundedCornerShape(4.dp))
+                    .background(Ink100, RoundedCornerShape(4.dp))
             ) {
                 Box(
                     modifier = Modifier
@@ -413,7 +401,7 @@ fun CategoryBudgetCard(
                     Icon(
                         imageVector = Icons.Outlined.WarningAmber,
                         contentDescription = "Cảnh báo vượt hạn mức",
-                        tint = Color(0xFFE11D48),
+                        tint = Alert500,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -422,7 +410,7 @@ fun CategoryBudgetCard(
                         fontFamily = FontCore,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp,
-                        color = Color(0xFFE11D48)
+                        color = Alert500
                     )
                 }
             }
@@ -446,12 +434,12 @@ fun SavingsGoalCard(
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFF0F3F8))
+        border = BorderStroke(1.dp, Ink100)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .background(iconBg, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -478,14 +466,14 @@ fun SavingsGoalCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
-                    .background(Color(0xFFF0F2F6), RoundedCornerShape(3.dp))
+                    .height(8.dp)
+                    .background(Ink100, RoundedCornerShape(4.dp))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
                         .fillMaxHeight()
-                        .background(progressColor, RoundedCornerShape(3.dp))
+                        .background(progressColor, RoundedCornerShape(4.dp))
                 )
             }
 

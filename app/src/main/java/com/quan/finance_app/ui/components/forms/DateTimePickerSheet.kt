@@ -36,12 +36,13 @@ fun DateTimePickerSheet(
     onDateSelected: (LocalDate) -> Unit,
     brandColor: Color,
     brandSoftColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialDate: LocalDate = LocalDate.now()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
-    var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var currentMonth by remember { mutableStateOf(YearMonth.from(initialDate)) }
+    var selectedDate by remember { mutableStateOf(initialDate) }
     val formatter = DateTimeFormatter.ofPattern("M, yyyy", Locale("vi", "VN"))
 
     ModalBottomSheet(

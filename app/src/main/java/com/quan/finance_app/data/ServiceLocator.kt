@@ -1,0 +1,26 @@
+package com.quan.finance_app.data
+
+import android.content.Context
+import com.quan.finance_app.data.local.TokenStore
+import com.quan.finance_app.data.remote.ApiClient
+
+/**
+ * Chỗ nối dây thủ công giữa các lớp, khởi tạo một lần trong [com.quan.finance_app.FinanceApp].
+ */
+object ServiceLocator {
+
+    lateinit var tokenStore: TokenStore
+        private set
+
+    lateinit var authRepository: AuthRepository
+        private set
+
+    lateinit var ledgerRepository: LedgerRepository
+        private set
+
+    fun init(context: Context) {
+        tokenStore = TokenStore(context.applicationContext)
+        authRepository = AuthRepository(ApiClient.authApi, tokenStore)
+        ledgerRepository = LedgerRepository(ApiClient.ledgerApi)
+    }
+}

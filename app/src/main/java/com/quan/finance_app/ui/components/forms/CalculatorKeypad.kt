@@ -51,7 +51,7 @@ fun CalculatorKeypad(
                     val textColor = when {
                         isEquals -> Color.White
                         isOperatorColumn -> brandColor // Dynamic text for operators
-                        isTopRow -> MoneyFlowTheme.colors.textPrimary
+                        isTopRow -> brandColor
                         else -> MoneyFlowTheme.colors.textPrimary
                     }
 
