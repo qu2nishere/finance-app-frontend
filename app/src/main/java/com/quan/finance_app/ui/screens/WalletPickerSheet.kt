@@ -51,6 +51,7 @@ fun WalletPickerSheet(
     isLoading: Boolean = false,
     onWalletSelected: (WalletDto) -> Unit,
     onAddWallet: ((name: String, kind: String, initialBalance: Long) -> Unit)? = null,
+    brandColor: Color = MoneyFlowTheme.colors.surfaceBrand,
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -116,7 +117,7 @@ fun WalletPickerSheet(
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = { showAddDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = MoneyFlowTheme.colors.surfaceBrand),
+                        colors = ButtonDefaults.buttonColors(containerColor = brandColor),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -139,13 +140,13 @@ fun WalletPickerSheet(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
-                                    if (isSelected) MoneyFlowTheme.colors.surfaceBrand.copy(alpha = 0.08f)
+                                    if (isSelected) brandColor.copy(alpha = 0.08f)
                                     else MoneyFlowTheme.colors.surfacePage
                                 )
                                 .border(
                                     BorderStroke(
                                         if (isSelected) 1.5.dp else 1.dp,
-                                        if (isSelected) MoneyFlowTheme.colors.surfaceBrand else MoneyFlowTheme.colors.borderSubtle
+                                        if (isSelected) brandColor else MoneyFlowTheme.colors.borderSubtle
                                     ),
                                     RoundedCornerShape(16.dp)
                                 )
@@ -162,15 +163,15 @@ fun WalletPickerSheet(
                                     .size(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(
-                                        if (isSelected) MoneyFlowTheme.colors.surfaceBrand
-                                        else MoneyFlowTheme.colors.surfaceBrand.copy(alpha = 0.12f)
+                                        if (isSelected) brandColor
+                                        else brandColor.copy(alpha = 0.12f)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     icon,
                                     contentDescription = wallet.name,
-                                    tint = if (isSelected) Color.White else MoneyFlowTheme.colors.surfaceBrand,
+                                    tint = if (isSelected) Color.White else brandColor,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -201,7 +202,7 @@ fun WalletPickerSheet(
                                     style = MoneyFlowTheme.typography.body,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontMono,
-                                    color = if (isSelected) MoneyFlowTheme.colors.surfaceBrand else MoneyFlowTheme.colors.textPrimary
+                                    color = if (isSelected) brandColor else MoneyFlowTheme.colors.textPrimary
                                 )
                                 if (isSelected) {
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -209,7 +210,7 @@ fun WalletPickerSheet(
                                         modifier = Modifier
                                             .size(18.dp)
                                             .clip(CircleShape)
-                                            .background(MoneyFlowTheme.colors.surfaceBrand),
+                                            .background(brandColor),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -234,10 +235,10 @@ fun WalletPickerSheet(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .border(
-                            BorderStroke(1.dp, MoneyFlowTheme.colors.surfaceBrand.copy(alpha = 0.4f)),
+                            BorderStroke(1.dp, brandColor.copy(alpha = 0.4f)),
                             RoundedCornerShape(14.dp)
                         )
-                        .background(MoneyFlowTheme.colors.surfaceBrand.copy(alpha = 0.05f))
+                        .background(brandColor.copy(alpha = 0.05f))
                         .clickable { showAddDialog = true }
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
@@ -249,7 +250,7 @@ fun WalletPickerSheet(
                         Icon(
                             Icons.Default.Add,
                             contentDescription = null,
-                            tint = MoneyFlowTheme.colors.surfaceBrand,
+                            tint = brandColor,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -257,7 +258,7 @@ fun WalletPickerSheet(
                             text = "Thêm ví mới",
                             style = MoneyFlowTheme.typography.body,
                             fontWeight = FontWeight.SemiBold,
-                            color = MoneyFlowTheme.colors.surfaceBrand
+                            color = brandColor
                         )
                     }
                 }
@@ -269,6 +270,7 @@ fun WalletPickerSheet(
 
     if (showAddDialog) {
         AddWalletDialog(
+            brand = brandColor,
             onDismissRequest = { showAddDialog = false },
             onConfirm = { name, kind, initialBalance ->
                 onAddWallet?.invoke(name, kind, initialBalance)
@@ -293,6 +295,7 @@ private fun walletNameHint(kind: String): String = when (kind) {
 
 @Composable
 private fun AddWalletDialog(
+    brand: Color,
     onDismissRequest: () -> Unit,
     onConfirm: (name: String, kind: String, initialBalance: Long) -> Unit
 ) {
@@ -303,7 +306,7 @@ private fun AddWalletDialog(
     val balance = balanceField.text.filter { it.isDigit() }.toLongOrNull() ?: 0L
     val nameFocus = remember { FocusRequester() }
     val canSubmit = walletName.isNotBlank()
-    val brand = MoneyFlowTheme.colors.surfaceBrand
+    val fieldColors = OutlinedTextFieldDefaults.colors(focusedBorderColor = brand, cursorColor = brand)
 
     fun submit() {
         if (canSubmit) onConfirm(walletName.trim(), selectedKind, balance)
@@ -367,6 +370,7 @@ private fun AddWalletDialog(
                                 WalletKindOption(
                                     kind = kind,
                                     selected = kind == selectedKind,
+                                    brand = brand,
                                     onClick = { selectedKind = kind },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -390,7 +394,8 @@ private fun AddWalletDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(nameFocus),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -416,7 +421,8 @@ private fun AddWalletDialog(
                     ),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -487,10 +493,10 @@ private fun AddWalletLabel(text: String) {
 private fun WalletKindOption(
     kind: String,
     selected: Boolean,
+    brand: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val brand = MoneyFlowTheme.colors.surfaceBrand
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))

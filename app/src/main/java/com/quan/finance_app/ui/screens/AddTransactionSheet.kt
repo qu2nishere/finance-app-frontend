@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -25,11 +26,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -59,6 +66,9 @@ fun AddTransactionScreen(
     val uiState by transactionViewModel.state.collectAsState()
 
     var isExpense by remember { mutableStateOf(!startWithIncome) }
+    // Mọi nút trên màn này theo loại giao dịch: chi màu cam, thu màu xanh lá
+    val flowColor = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn
+    val flowSoftColor = if (isExpense) MoneyFlowTheme.colors.surfaceOutSoft else MoneyFlowTheme.colors.surfaceInSoft
     // ViewModel sống theo Activity nên còn giữ loại thu/chi của lần mở trước —
     // đồng bộ lại mỗi lần mở để giao diện và dữ liệu gửi lên luôn khớp nhau
     LaunchedEffect(Unit) { transactionViewModel.setExpense(!startWithIncome) }
@@ -127,7 +137,7 @@ fun AddTransactionScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onDismissRequest) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MoneyFlowTheme.colors.textPrimary)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = flowColor)
                     }
                     Text(
                         text = "Thêm giao dịch",
@@ -348,8 +358,8 @@ fun AddTransactionScreen(
                                 label = "Vào ví · ",
                                 value = currentWalletName,
                                 valueBold = false,
-                                brandColor = MoneyFlowTheme.colors.borderSubtle,
-                                brandSoftColor = MoneyFlowTheme.colors.surfacePage,
+                                brandColor = MoneyFlowTheme.colors.flowIn,
+                                brandSoftColor = MoneyFlowTheme.colors.surfaceInSoft,
                                 onClick = { showWalletPicker = true }
                             )
                         }
@@ -371,14 +381,15 @@ fun AddTransactionScreen(
                             .weight(1.2f)
                             .height(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MoneyFlowTheme.colors.surfacePage)
+                            .background(Color.White)
+                            .border(1.dp, flowSoftColor, RoundedCornerShape(12.dp))
                             .clickable { showDatePicker = true }
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = MoneyFlowTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = flowColor, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = selectedDate.format(dateFormatter), style = MoneyFlowTheme.typography.caption, color = MoneyFlowTheme.colors.textPrimary, fontFamily = FontCore)
+                        Text(text = selectedDate.format(dateFormatter), style = MoneyFlowTheme.typography.caption, color = flowColor, fontFamily = FontCore)
                     }
 
                     // Note Action
@@ -386,8 +397,9 @@ fun AddTransactionScreen(
                         modifier = Modifier
                             .weight(1.5f)
                             .height(44.dp)
-                            .border(1.dp, if (isExpense) MoneyFlowTheme.colors.surfaceOutSoft else MoneyFlowTheme.colors.surfaceInSoft, RoundedCornerShape(12.dp))
-                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (noteText.isBlank()) Color.White else flowSoftColor)
+                            .border(1.dp, flowSoftColor, RoundedCornerShape(12.dp))
                             .clickable { showNoteDialog = true }
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -405,7 +417,8 @@ fun AddTransactionScreen(
                             style = MoneyFlowTheme.typography.caption,
                             color = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
                             fontFamily = FontCore,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -565,28 +578,170 @@ fun AddTransactionScreen(
                 transactionViewModel.createWallet(name, kind, initialBalance) { newWallet ->
                     transactionViewModel.selectWallet(newWallet)
                 }
-            }
+            },
+            brandColor = flowColor
         )
     }
 
     if (showNoteDialog) {
-        AlertDialog(
+        NoteSheet(
+            isExpense = isExpense,
+            initialNote = noteText,
+            flowColor = flowColor,
+            flowSoftColor = flowSoftColor,
             onDismissRequest = { showNoteDialog = false },
-            title = { Text("Ghi chú giao dịch") },
-            text = {
-                OutlinedTextField(
-                    value = noteText,
-                    onValueChange = { noteText = it },
-                    placeholder = { Text("Ví dụ: Ăn trưa với đồng nghiệp") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showNoteDialog = false }) {
-                    Text("Xong")
-                }
+            onSave = { note ->
+                noteText = note
+                showNoteDialog = false
             }
         )
+    }
+}
+
+// Khớp với cột transactions.note VARCHAR(500) ở ledger-service
+private const val NOTE_MAX_LENGTH = 500
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NoteSheet(
+    isExpense: Boolean,
+    initialNote: String,
+    flowColor: Color,
+    flowSoftColor: Color,
+    onDismissRequest: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    // Chỉ ghi vào giao dịch khi bấm Lưu, nên Huỷ giữ nguyên ghi chú cũ
+    var draft by remember { mutableStateOf(TextFieldValue(initialNote, TextRange(initialNote.length))) }
+    val focusRequester = remember { FocusRequester() }
+    val suggestions = if (isExpense) {
+        listOf("Ăn trưa", "Cà phê", "Đổ xăng", "Đi chợ", "Trả nợ")
+    } else {
+        listOf("Lương tháng", "Thưởng", "Bán hàng", "Hoàn tiền", "Được tặng")
+    }
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MoneyFlowTheme.colors.surfaceCard
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (isExpense) "Ghi chú khoản chi" else "Ghi chú khoản thu",
+                    style = MoneyFlowTheme.typography.title2,
+                    color = MoneyFlowTheme.colors.textPrimary,
+                    fontFamily = FontCore,
+                    modifier = Modifier.weight(1f)
+                )
+                if (draft.text.isNotEmpty()) {
+                    Text(
+                        text = "Xoá",
+                        style = MoneyFlowTheme.typography.bodySm,
+                        fontWeight = FontWeight.SemiBold,
+                        color = flowColor,
+                        fontFamily = FontCore,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { draft = TextFieldValue("") }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { if (it.text.length <= NOTE_MAX_LENGTH) draft = it },
+                placeholder = {
+                    Text(if (isExpense) "Khoản chi này dùng cho việc gì?" else "Khoản thu này đến từ đâu?")
+                },
+                minLines = 3,
+                maxLines = 5,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = flowColor,
+                    cursorColor = flowColor
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${draft.text.length}/$NOTE_MAX_LENGTH",
+                style = MoneyFlowTheme.typography.caption,
+                color = MoneyFlowTheme.colors.textTertiary,
+                fontFamily = FontMono,
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(suggestions) { suggestion ->
+                    Box(
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(flowSoftColor)
+                            .clickable {
+                                val current = draft.text.trimEnd()
+                                val next = (if (current.isEmpty()) suggestion else "$current, $suggestion")
+                                    .take(NOTE_MAX_LENGTH)
+                                draft = TextFieldValue(next, TextRange(next.length))
+                            }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = suggestion,
+                            style = MoneyFlowTheme.typography.caption,
+                            fontWeight = FontWeight.Medium,
+                            color = flowColor,
+                            fontFamily = FontCore
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onDismissRequest,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MoneyFlowTheme.colors.borderSubtle)
+                ) {
+                    Text("Huỷ", color = MoneyFlowTheme.colors.textSecondary, fontFamily = FontCore)
+                }
+                Button(
+                    onClick = { onSave(draft.text.trim()) },
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = flowColor)
+                ) {
+                    Text("Lưu ghi chú", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontCore)
+                }
+            }
+        }
     }
 }
 
@@ -633,7 +788,7 @@ fun SelectorButton(
             fontFamily = FontCore
         )
         Spacer(modifier = Modifier.weight(1f))
-        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MoneyFlowTheme.colors.textSecondary)
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = brandColor)
     }
 }
 

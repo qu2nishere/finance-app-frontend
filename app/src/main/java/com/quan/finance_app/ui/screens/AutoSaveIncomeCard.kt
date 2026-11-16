@@ -145,13 +145,13 @@ fun AutoSaveIncomeCard(
                 Box(
                     modifier = Modifier
                         .size(26.dp)
-                        .background(Ink100, RoundedCornerShape(7.dp)),
+                        .background(Grow50, RoundedCornerShape(7.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Settings,
                         contentDescription = null,
-                        tint = MoneyFlowTheme.colors.textSecondary,
+                        tint = Grow600,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -161,12 +161,12 @@ fun AutoSaveIncomeCard(
                     modifier = Modifier.weight(1f),
                     fontFamily = FontCore,
                     fontSize = 12.sp,
-                    color = MoneyFlowTheme.colors.textSecondary
+                    color = Grow600
                 )
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MoneyFlowTheme.colors.textTertiary,
+                    tint = Grow600,
                     modifier = Modifier.size(18.dp)
                 )
             }
