@@ -95,7 +95,7 @@ fun AllTransactionsScreen(
                     val isIncome = txn.type == "INCOME"
                     LedgerEntry(
                         id = txn.id,
-                        title = txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch",
+                        title = txn.merchant?.ifBlank { null } ?: txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch",
                         meta = (txn.categoryName ?: "Chưa phân loại") + (txn.walletName?.let { " · $it" } ?: ""),
                         amount = txn.signedAmount,
                         icon = getCategoryIcon(txn.categoryName),

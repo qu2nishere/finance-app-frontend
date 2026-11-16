@@ -334,7 +334,7 @@ fun DashboardTransactions(
                         val amountText = (if (isIncome) "+" else "−") + formatter.format(txn.amount) + "₫"
                         val amountColor = if (isIncome) Grow600 else MoneyFlowTheme.colors.textPrimary
                         val icon = getCategoryIcon(txn.categoryName)
-                        val title = txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch"
+                        val title = txn.merchant?.ifBlank { null } ?: txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch"
                         val subtitle = (txn.categoryName ?: "Chưa phân loại") +
                                 (txn.walletName?.let { " · $it" } ?: "") +
                                 " · ${txn.occurredDate}"

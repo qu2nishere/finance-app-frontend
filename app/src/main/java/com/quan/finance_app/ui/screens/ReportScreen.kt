@@ -75,6 +75,14 @@ fun ReportScreen(modifier: Modifier = Modifier) {
     var currentMonth by remember { mutableIntStateOf(8) }
     var currentYear by remember { mutableIntStateOf(2026) }
     var selectedExpenseDayFilter by remember { mutableStateOf("ALL") }
+    val goPreviousMonth = {
+        selectedExpenseDayFilter = "ALL"
+        if (currentMonth == 1) { currentMonth = 12; currentYear -= 1 } else currentMonth -= 1
+    }
+    val goNextMonth = {
+        selectedExpenseDayFilter = "ALL"
+        if (currentMonth == 12) { currentMonth = 1; currentYear += 1 } else currentMonth += 1
+    }
     val tabs = listOf("Chi tiêu", "Thu nhập", "Dòng tiền")
 
     LazyColumn(
@@ -89,22 +97,9 @@ fun ReportScreen(modifier: Modifier = Modifier) {
             MonthSelectorHeader(
                 month = currentMonth,
                 year = currentYear,
-                onPreviousMonth = {
-                    if (currentMonth == 1) {
-                        currentMonth = 12
-                        currentYear -= 1
-                    } else {
-                        currentMonth -= 1
-                    }
-                },
-                onNextMonth = {
-                    if (currentMonth == 12) {
-                        currentMonth = 1
-                        currentYear += 1
-                    } else {
-                        currentMonth += 1
-                    }
-                }
+                onPreviousMonth = { goPreviousMonth() },
+                onNextMonth = { goNextMonth() },
+                showMonthPicker = selectedTab != 0
             )
         }
 
@@ -142,23 +137,15 @@ fun ReportScreen(modifier: Modifier = Modifier) {
                         month = currentMonth,
                         year = currentYear,
                         selectedDayKey = selectedExpenseDayFilter,
-                        onSelectDayKey = { selectedExpenseDayFilter = it }
+                        onSelectDayKey = { selectedExpenseDayFilter = it },
+                        onPreviousMonth = { goPreviousMonth() },
+                        onNextMonth = { goNextMonth() },
+                        onPickDate = { d ->
+                            currentMonth = d.monthValue
+                            currentYear = d.year
+                            selectedExpenseDayFilter = "%02d/%02d".format(d.dayOfMonth, d.monthValue)
+                        }
                     )
-                }
-
-                item {
-                    Text(
-                        text = "Theo danh mục",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MoneyFlowTheme.colors.textPrimary,
-                        fontFamily = FontCore,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                item {
-                    ExpenseCategoryCard()
                 }
 
                 item {
@@ -284,9 +271,30 @@ fun MonthSelectorHeader(
     month: Int,
     year: Int,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    showMonthPicker: Boolean = true
 ) {
     MfTabHeader(title = "Thống kê") {
+        if (showMonthPicker) {
+            MonthStepper(month, year, onPreviousMonth, onNextMonth)
+        }
+    }
+}
+
+@Composable
+fun MonthStepper(
+    month: Int,
+    year: Int,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    modifier: Modifier = Modifier,
+    fillWidth: Boolean = false
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (fillWidth) Arrangement.SpaceBetween else Arrangement.Start
+    ) {
         IconButton(onClick = onPreviousMonth, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
@@ -312,6 +320,10 @@ fun MonthSelectorHeader(
         }
     }
 }
+
+// -------------------------------------------------------------------------
+// 2. Tabs
+// -------------------------------------------------------------------------
 
 @Composable
 fun ReportTabs(
@@ -652,7 +664,10 @@ fun MonthTransactionsLedgerCard(
     month: Int,
     year: Int,
     selectedDayKey: String,
-    onSelectDayKey: (String) -> Unit
+    onSelectDayKey: (String) -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onPickDate: (java.time.LocalDate) -> Unit
 ) {
     val monthGroups = remember(month, year) {
         getMonthTransactionsData(month, year)
@@ -734,40 +749,80 @@ fun MonthTransactionsLedgerCard(
                 }
             }
 
-            // Bộ lọc chi tiêu theo ngày (Horizontal filter chips)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Lọc theo ngày trong tháng:",
-                    fontFamily = FontCore,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
-                    color = MoneyFlowTheme.colors.textSecondary
-                )
-                Row(
+            // Lớp lọc 1: theo tháng - tràn hết một hàng
+            MonthStepper(
+                month = month,
+                year = year,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Ink50, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                fillWidth = true
+            )
+
+            // Lớp lọc 2: theo ngày (date picker) trong tháng đã chọn, kèm nút xem cả tháng
+            var showDatePicker by remember { mutableStateOf(false) }
+            val pickedLabel = if (selectedDayKey == "ALL") "Chọn ngày" else "Ngày $selectedDayKey"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedDayKey == "ALL") Ink100 else Heat500,
+                    border = if (selectedDayKey == "ALL") BorderStroke(1.dp, Ink200) else null,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .weight(1f)
+                        .clickable { showDatePicker = true }
                 ) {
-                    filterChips.forEach { (key, label) ->
-                        val isSelected = selectedDayKey == key
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (isSelected) Heat500 else Ink100,
-                            border = if (isSelected) null else BorderStroke(1.dp, Ink200),
-                            modifier = Modifier.clickable { onSelectDayKey(key) }
-                        ) {
-                            Text(
-                                text = label,
-                                fontFamily = FontCore,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 12.sp,
-                                color = if (isSelected) Color.White else MoneyFlowTheme.colors.textSecondary,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val fg = if (selectedDayKey == "ALL") MoneyFlowTheme.colors.textSecondary else Color.White
+                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = pickedLabel,
+                            fontFamily = FontCore,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = fg
+                        )
                     }
                 }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (selectedDayKey == "ALL") Heat500 else Heat50,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelectDayKey("ALL") }
+                ) {
+                    Text(
+                        text = "Xem cả tháng",
+                        fontFamily = FontCore,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        color = if (selectedDayKey == "ALL") Color.White else Heat700,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                    )
+                }
+            }
+            if (showDatePicker) {
+                com.quan.finance_app.ui.components.forms.DateTimePickerSheet(
+                    onDismissRequest = { showDatePicker = false },
+                    onDateSelected = { date ->
+                        showDatePicker = false
+                        onPickDate(date)
+                    },
+                    brandColor = Heat500,
+                    brandSoftColor = Heat50,
+                    initialDate = java.time.LocalDate.of(year, month, 1)
+                )
             }
 
             HorizontalDivider(color = Ink100)
@@ -826,7 +881,15 @@ fun MonthTransactionsLedgerCard(
             } else {
                 // Hiển thị riêng ngày được chọn
                 val selectedGroup = monthGroups.find { it.dateKey == selectedDayKey }
-                if (selectedGroup != null) {
+                if (selectedGroup == null) {
+                    Text(
+                        text = "Không có giao dịch nào trong ngày $selectedDayKey",
+                        fontFamily = FontCore,
+                        fontSize = 13.sp,
+                        color = MoneyFlowTheme.colors.textSecondary,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         // Banner ngày chọn
                         Row(

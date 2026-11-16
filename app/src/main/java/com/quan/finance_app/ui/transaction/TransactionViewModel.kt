@@ -155,6 +155,7 @@ class TransactionViewModel(
         amount: Long,
         date: LocalDate,
         note: String,
+        name: String = "",
         onSuccess: () -> Unit
     ) {
         val current = _state.value
@@ -180,7 +181,9 @@ class TransactionViewModel(
                 type = type,
                 amount = amount,
                 occurredAt = occurredAtStr,
-                note = note.ifBlank { null }
+                note = note.ifBlank { null },
+                // Tên giao dịch lưu ở cột transactions.merchant (VARCHAR(150)) có sẵn
+                merchant = name.trim().ifBlank { null }
             )
 
             ledgerRepository.createTransaction(req)
