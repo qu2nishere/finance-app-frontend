@@ -248,6 +248,28 @@ fun AddTransactionScreen(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Tên giao dịch (khớp cột transactions.merchant VARCHAR(150)) — ngay dưới số tiền
+                OutlinedTextField(
+                    value = nameText,
+                    onValueChange = { if (it.length <= 150) nameText = it },
+                    placeholder = {
+                        Text(if (isExpense) "Tên khoản chi (VD: Cà phê Highlands)" else "Tên khoản thu (VD: Lương tháng 8)")
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = flowColor,
+                        unfocusedBorderColor = flowColor,
+                        cursorColor = flowColor
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                )
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Selectors & Quick Chips
@@ -368,28 +390,6 @@ fun AddTransactionScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // Tên giao dịch (khớp cột transactions.merchant VARCHAR(150))
-                OutlinedTextField(
-                    value = nameText,
-                    onValueChange = { if (it.length <= 150) nameText = it },
-                    placeholder = {
-                        Text(if (isExpense) "Tên khoản chi (VD: Cà phê Highlands)" else "Tên khoản thu (VD: Lương tháng 8)")
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = flowColor,
-                        unfocusedBorderColor = flowSoftColor,
-                        cursorColor = flowColor
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 // Date & Note Action Row
                 Row(
