@@ -42,5 +42,6 @@ data class ProblemDetailDto(
     val status: Int = 0,
     val title: String? = null,
     val detail: String? = null,
+    val code: String? = null,
     val errors: Map<String, String>? = null
 )
