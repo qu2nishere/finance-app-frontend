@@ -33,6 +33,7 @@ import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
 import com.quan.finance_app.ui.home.HomeViewModel
+import com.quan.finance_app.ui.report.ReportViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,7 +80,8 @@ enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
 @Composable
 fun MainApp(
     authViewModel: AuthViewModel = viewModel(),
-    homeViewModel: HomeViewModel = viewModel()
+    homeViewModel: HomeViewModel = viewModel(),
+    reportViewModel: ReportViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
     val context = LocalContext.current
@@ -222,7 +224,7 @@ fun MainApp(
                             onOpenGoal = { push(Route.SavingsGoals) },
                             onOpenNotifications = { push(Route.Notifications) }
                         )
-                        1 -> ReportScreen()
+                        1 -> ReportRoute(reportViewModel = reportViewModel)
                         2 -> BudgetScreen(
                             onNavigateToSavingsGoals = { push(Route.SavingsGoals) }
                         )

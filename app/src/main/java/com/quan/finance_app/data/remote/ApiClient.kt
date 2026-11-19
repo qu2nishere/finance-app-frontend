@@ -50,4 +50,5 @@ object ApiClient {
 
     val authApi: AuthApi = retrofit.create(AuthApi::class.java)
     val ledgerApi: LedgerApi = retrofit.create(LedgerApi::class.java)
+    val reportApi: ReportApi = retrofit.create(ReportApi::class.java)
 }

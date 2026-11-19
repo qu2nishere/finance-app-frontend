@@ -18,9 +18,13 @@ object ServiceLocator {
     lateinit var ledgerRepository: LedgerRepository
         private set
 
+    lateinit var reportRepository: ReportRepository
+        private set
+
     fun init(context: Context) {
         tokenStore = TokenStore(context.applicationContext)
         authRepository = AuthRepository(ApiClient.authApi, tokenStore)
         ledgerRepository = LedgerRepository(ApiClient.ledgerApi)
+        reportRepository = ReportRepository(ApiClient.reportApi)
     }
 }

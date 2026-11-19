@@ -43,8 +43,27 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.data.CategoryBreakdownItem
+import com.quan.finance_app.data.MonthlyBarPoint
+import com.quan.finance_app.data.MonthlyTransactionsData
+import com.quan.finance_app.data.MonthlyTrendData
+import com.quan.finance_app.data.ReportTransactionItem
 import com.quan.finance_app.ui.components.core.MfTabHeader
+import com.quan.finance_app.ui.report.IncomeFilterOption
+import com.quan.finance_app.ui.report.ReportUiState
+import com.quan.finance_app.ui.report.ReportViewModel
 import com.quan.finance_app.ui.theme.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val REPORT_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
+private val REPORT_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val REPORT_ZONE: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
 
 data class DualBarData(
     val label: String,
@@ -53,36 +72,43 @@ data class DualBarData(
     val isCurrent: Boolean
 )
 
-data class DailyExpenseItem(
-    val title: String,
-    val category: String,
-    val amount: Long,
-    val time: String,
-    val wallet: String,
-    val icon: ImageVector
-)
-
-data class DayExpenseGroup(
-    val dateKey: String,
-    val dateLabel: String,
-    val totalAmount: Long,
-    val items: List<DailyExpenseItem>
-)
+@Composable
+fun ReportRoute(
+    reportViewModel: ReportViewModel = viewModel(),
+    modifier: Modifier = Modifier
+) {
+    val state by reportViewModel.state.collectAsState()
+    LaunchedEffect(Unit) {
+        reportViewModel.refresh()
+    }
+    ReportScreen(
+        state = state,
+        onSelectTab = reportViewModel::selectTab,
+        onPreviousMonth = reportViewModel::goPreviousMonth,
+        onNextMonth = reportViewModel::goNextMonth,
+        onSelectIncomeCategory = reportViewModel::selectIncomeCategory,
+        onPickDate = reportViewModel::selectDate,
+        onClearDate = reportViewModel::clearDateFilter,
+        onRefresh = reportViewModel::refresh,
+        modifier = modifier
+    )
+}
 
 @Composable
-fun ReportScreen(modifier: Modifier = Modifier) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var currentMonth by remember { mutableIntStateOf(8) }
-    var currentYear by remember { mutableIntStateOf(2026) }
-    var selectedExpenseDayFilter by remember { mutableStateOf("ALL") }
-    val goPreviousMonth = {
-        selectedExpenseDayFilter = "ALL"
-        if (currentMonth == 1) { currentMonth = 12; currentYear -= 1 } else currentMonth -= 1
-    }
-    val goNextMonth = {
-        selectedExpenseDayFilter = "ALL"
-        if (currentMonth == 12) { currentMonth = 1; currentYear += 1 } else currentMonth += 1
-    }
+fun ReportScreen(
+    state: ReportUiState = ReportUiState(),
+    onSelectTab: (Int) -> Unit = {},
+    onPreviousMonth: () -> Unit = {},
+    onNextMonth: () -> Unit = {},
+    onSelectIncomeCategory: (String?, String) -> Unit = { _, _ -> },
+    onPickDate: (LocalDate) -> Unit = {},
+    onClearDate: () -> Unit = {},
+    onRefresh: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val selectedTab = state.selectedTab
+    val currentMonth = state.month
+    val currentYear = state.year
     val tabs = listOf("Chi tiêu", "Thu nhập", "Dòng tiền")
 
     LazyColumn(
@@ -97,8 +123,8 @@ fun ReportScreen(modifier: Modifier = Modifier) {
             MonthSelectorHeader(
                 month = currentMonth,
                 year = currentYear,
-                onPreviousMonth = { goPreviousMonth() },
-                onNextMonth = { goNextMonth() },
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
                 showMonthPicker = selectedTab != 0
             )
         }
@@ -108,7 +134,7 @@ fun ReportScreen(modifier: Modifier = Modifier) {
             ReportTabs(
                 tabs = tabs,
                 selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
+                onTabSelected = onSelectTab
             )
         }
 
@@ -136,15 +162,15 @@ fun ReportScreen(modifier: Modifier = Modifier) {
                     MonthTransactionsLedgerCard(
                         month = currentMonth,
                         year = currentYear,
-                        selectedDayKey = selectedExpenseDayFilter,
-                        onSelectDayKey = { selectedExpenseDayFilter = it },
-                        onPreviousMonth = { goPreviousMonth() },
-                        onNextMonth = { goNextMonth() },
-                        onPickDate = { d ->
-                            currentMonth = d.monthValue
-                            currentYear = d.year
-                            selectedExpenseDayFilter = "%02d/%02d".format(d.dayOfMonth, d.monthValue)
-                        }
+                        selectedDate = state.selectedDate,
+                        transactionsData = state.expenseTransactions,
+                        isLoading = state.isTransactionsLoading,
+                        errorMessage = state.transactionsError,
+                        onPreviousMonth = onPreviousMonth,
+                        onNextMonth = onNextMonth,
+                        onPickDate = onPickDate,
+                        onClearDate = onClearDate,
+                        onRetry = onRefresh
                     )
                 }
 
@@ -175,7 +201,18 @@ fun ReportScreen(modifier: Modifier = Modifier) {
             // TAB 2: THU NHẬP
             1 -> {
                 item {
-                    IncomeOverviewCard()
+                    IncomeOverviewCard(
+                        year = currentYear,
+                        month = currentMonth,
+                        selectedCategoryId = state.selectedIncomeCategoryId,
+                        selectedCategoryLabel = state.selectedIncomeCategoryLabel,
+                        filterOptions = state.incomeFilterOptions,
+                        trendData = state.incomeTrend,
+                        isLoading = state.isTrendLoading,
+                        errorMessage = state.trendError,
+                        onSelectCategory = onSelectIncomeCategory,
+                        onRetry = onRefresh
+                    )
                 }
 
                 item {
@@ -190,7 +227,12 @@ fun ReportScreen(modifier: Modifier = Modifier) {
                 }
 
                 item {
-                    IncomeSourceCard()
+                    IncomeSourceCard(
+                        month = currentMonth,
+                        year = currentYear,
+                        breakdown = state.categoryBreakdown,
+                        isLoading = state.isTrendLoading
+                    )
                 }
 
                 item {
@@ -492,198 +534,26 @@ fun ExpenseOverviewCard() {
 // 2b. Danh sách toàn bộ giao dịch đã thực hiện trong tháng & Lọc theo ngày
 // -------------------------------------------------------------------------
 
-private fun getMonthTransactionsData(month: Int, year: Int): List<DayExpenseGroup> {
-    val mStr = month.toString().padStart(2, '0')
-    return when (month) {
-        8 -> listOf(
-            DayExpenseGroup(
-                dateKey = "22/$mStr",
-                dateLabel = "Hôm nay (22/$mStr)",
-                totalAmount = 285000L,
-                items = listOf(
-                    DailyExpenseItem("Highlands Coffee", "Ăn uống", 72000L, "09:12", "Ví Momo", Icons.Outlined.Restaurant),
-                    DailyExpenseItem("Cơm trưa văn phòng", "Ăn uống", 45000L, "12:30", "Tiền mặt", Icons.Outlined.Restaurant),
-                    DailyExpenseItem("Siêu thị WinMart", "Mua sắm", 168000L, "18:45", "Vietcombank", Icons.Outlined.ShoppingBag)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "21/$mStr",
-                dateLabel = "Hôm qua (21/$mStr)",
-                totalAmount = 310000L,
-                items = listOf(
-                    DailyExpenseItem("Grab Bike đi làm", "Di chuyển", 38000L, "08:15", "Ví Momo", Icons.Outlined.DirectionsCar),
-                    DailyExpenseItem("Bún chả Hà Nội", "Ăn uống", 55000L, "12:15", "Tiền mặt", Icons.Outlined.Restaurant),
-                    DailyExpenseItem("Nhà sách Fahasa", "Mua sắm", 185000L, "19:20", "Vietcombank", Icons.Outlined.ShoppingBag),
-                    DailyExpenseItem("Trà sữa Gongcha", "Ăn uống", 32000L, "21:00", "Ví Momo", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "20/$mStr",
-                dateLabel = "20/$mStr",
-                totalAmount = 145000L,
-                items = listOf(
-                    DailyExpenseItem("Phở bò gia truyền", "Ăn uống", 50000L, "07:45", "Tiền mặt", Icons.Outlined.Restaurant),
-                    DailyExpenseItem("Xăng xe máy", "Di chuyển", 95000L, "17:30", "Tiền mặt", Icons.Outlined.DirectionsCar)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "19/$mStr",
-                dateLabel = "19/$mStr",
-                totalAmount = 520000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền điện tháng 7", "Hoá đơn & nhà ở", 420000L, "10:00", "Vietcombank", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Bánh mì & Cà phê", "Ăn uống", 40000L, "08:00", "Ví Momo", Icons.Outlined.Restaurant),
-                    DailyExpenseItem("Gửi xe tháng", "Di chuyển", 60000L, "18:00", "Tiền mặt", Icons.Outlined.DirectionsCar)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "18/$mStr",
-                dateLabel = "18/$mStr",
-                totalAmount = 190000L,
-                items = listOf(
-                    DailyExpenseItem("Pizza Hut tối", "Ăn uống", 190000L, "19:30", "Ví Momo", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "15/$mStr",
-                dateLabel = "15/$mStr",
-                totalAmount = 1410000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền nước sinh hoạt", "Hoá đơn & nhà ở", 125000L, "09:00", "Vietcombank", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Mua giày thể thao", "Mua sắm", 850000L, "15:30", "Vietcombank", Icons.Outlined.ShoppingBag),
-                    DailyExpenseItem("Lẩu Kichi Kichi", "Ăn uống", 435000L, "20:00", "Ví Momo", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "12/$mStr",
-                dateLabel = "12/$mStr",
-                totalAmount = 185000L,
-                items = listOf(
-                    DailyExpenseItem("Đổ xăng xe máy", "Di chuyển", 120000L, "08:30", "Tiền mặt", Icons.Outlined.DirectionsCar),
-                    DailyExpenseItem("Cà phê Trung Nguyên", "Ăn uống", 65000L, "14:00", "Ví Momo", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "08/$mStr",
-                dateLabel = "08/$mStr",
-                totalAmount = 675000L,
-                items = listOf(
-                    DailyExpenseItem("Gói cước 4G Viettel", "Hoá đơn & nhà ở", 150000L, "11:00", "Ví Momo", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Mua sắm Uniqlo", "Mua sắm", 525000L, "16:30", "Vietcombank", Icons.Outlined.ShoppingBag)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "05/$mStr",
-                dateLabel = "05/$mStr",
-                totalAmount = 455000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền internet FPT", "Hoá đơn & nhà ở", 275000L, "10:30", "Vietcombank", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Cơm trưa nhóm", "Ăn uống", 180000L, "12:45", "Ví Momo", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "01/$mStr",
-                dateLabel = "01/$mStr",
-                totalAmount = 3780000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền thuê nhà tháng 8", "Hoá đơn & nhà ở", 3500000L, "09:00", "Vietcombank", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Grab Car đi sân bay", "Di chuyển", 280000L, "06:30", "Ví Momo", Icons.Outlined.DirectionsCar)
-                )
-            )
-        )
-        7 -> listOf(
-            DayExpenseGroup(
-                dateKey = "30/$mStr",
-                dateLabel = "30/$mStr",
-                totalAmount = 780000L,
-                items = listOf(
-                    DailyExpenseItem("Ăn tối nhà hàng", "Ăn uống", 650000L, "19:30", "Ví Momo", Icons.Outlined.Restaurant),
-                    DailyExpenseItem("Grab Car", "Di chuyển", 130000L, "21:30", "Ví Momo", Icons.Outlined.DirectionsCar)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "20/$mStr",
-                dateLabel = "20/$mStr",
-                totalAmount = 2150000L,
-                items = listOf(
-                    DailyExpenseItem("Bảo dưỡng xe máy", "Di chuyển", 1850000L, "10:00", "Vietcombank", Icons.Outlined.DirectionsCar),
-                    DailyExpenseItem("Cơm trưa", "Ăn uống", 300000L, "12:00", "Tiền mặt", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "15/$mStr",
-                dateLabel = "15/$mStr",
-                totalAmount = 1420000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền điện nước T6", "Hoá đơn & nhà ở", 520000L, "09:00", "Vietcombank", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Mua sắm đồ gia dụng", "Mua sắm", 900000L, "16:00", "Vietcombank", Icons.Outlined.ShoppingBag)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "01/$mStr",
-                dateLabel = "01/$mStr",
-                totalAmount = 3500000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền thuê nhà tháng 7", "Hoá đơn & nhà ở", 3500000L, "08:30", "Vietcombank", Icons.Outlined.Receipt)
-                )
-            )
-        )
-        else -> listOf(
-            DayExpenseGroup(
-                dateKey = "25/$mStr",
-                dateLabel = "25/$mStr",
-                totalAmount = 450000L,
-                items = listOf(
-                    DailyExpenseItem("Siêu thị Co.opmart", "Mua sắm", 320000L, "18:00", "Vietcombank", Icons.Outlined.ShoppingBag),
-                    DailyExpenseItem("Ăn tối gia đình", "Ăn uống", 130000L, "19:30", "Tiền mặt", Icons.Outlined.Restaurant)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "15/$mStr",
-                dateLabel = "15/$mStr",
-                totalAmount = 850000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền điện nước", "Hoá đơn & nhà ở", 550000L, "09:00", "Vietcombank", Icons.Outlined.Receipt),
-                    DailyExpenseItem("Xăng xe", "Di chuyển", 300000L, "16:00", "Tiền mặt", Icons.Outlined.DirectionsCar)
-                )
-            ),
-            DayExpenseGroup(
-                dateKey = "01/$mStr",
-                dateLabel = "01/$mStr",
-                totalAmount = 3500000L,
-                items = listOf(
-                    DailyExpenseItem("Tiền thuê nhà", "Hoá đơn & nhà ở", 3500000L, "08:00", "Vietcombank", Icons.Outlined.Receipt)
-                )
-            )
-        )
-    }
-}
-
 @Composable
 fun MonthTransactionsLedgerCard(
     month: Int,
     year: Int,
-    selectedDayKey: String,
-    onSelectDayKey: (String) -> Unit,
+    selectedDate: LocalDate?,
+    transactionsData: MonthlyTransactionsData?,
+    isLoading: Boolean,
+    errorMessage: String?,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onPickDate: (java.time.LocalDate) -> Unit
+    onPickDate: (LocalDate) -> Unit,
+    onClearDate: () -> Unit,
+    onRetry: () -> Unit
 ) {
-    val monthGroups = remember(month, year) {
-        getMonthTransactionsData(month, year)
-    }
+    val today = remember { LocalDate.now(REPORT_ZONE) }
+    val yesterday = remember(today) { today.minusDays(1) }
 
-    val totalMonthSpent = remember(monthGroups) {
-        monthGroups.sumOf { it.totalAmount }
-    }
-
-    val totalTxnCount = remember(monthGroups) {
-        monthGroups.sumOf { it.items.size }
-    }
-
-    val filterChips = remember(monthGroups) {
-        listOf("ALL" to "Tất cả các ngày") + monthGroups.map { it.dateKey to it.dateLabel }
-    }
+    val monthGroups = transactionsData?.days ?: emptyList()
+    val totalMonthSpent = transactionsData?.monthTotalAmount ?: 0L
+    val totalTxnCount = transactionsData?.monthTxnCount ?: 0
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -735,7 +605,7 @@ fun MonthTransactionsLedgerCard(
                     )
                 }
 
-                if (selectedDayKey != "ALL") {
+                if (selectedDate != null) {
                     Text(
                         text = "Xem tất cả",
                         fontFamily = FontCore,
@@ -743,7 +613,7 @@ fun MonthTransactionsLedgerCard(
                         fontSize = 12.sp,
                         color = Blue500,
                         modifier = Modifier
-                            .clickable { onSelectDayKey("ALL") }
+                            .clickable(onClick = onClearDate)
                             .padding(4.dp)
                     )
                 }
@@ -764,7 +634,11 @@ fun MonthTransactionsLedgerCard(
 
             // Lớp lọc 2: theo ngày (date picker) trong tháng đã chọn, kèm nút xem cả tháng
             var showDatePicker by remember { mutableStateOf(false) }
-            val pickedLabel = if (selectedDayKey == "ALL") "Chọn ngày" else "Ngày $selectedDayKey"
+            val pickedLabel = if (selectedDate == null) {
+                "Chọn ngày"
+            } else {
+                "Ngày ${selectedDate.format(REPORT_DAY_FORMATTER)}"
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -772,8 +646,8 @@ fun MonthTransactionsLedgerCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (selectedDayKey == "ALL") Ink100 else Heat500,
-                    border = if (selectedDayKey == "ALL") BorderStroke(1.dp, Ink200) else null,
+                    color = if (selectedDate == null) Ink100 else Heat500,
+                    border = if (selectedDate == null) BorderStroke(1.dp, Ink200) else null,
                     modifier = Modifier
                         .weight(1f)
                         .clickable { showDatePicker = true }
@@ -782,8 +656,13 @@ fun MonthTransactionsLedgerCard(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val fg = if (selectedDayKey == "ALL") MoneyFlowTheme.colors.textSecondary else Color.White
-                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+                        val fg = if (selectedDate == null) MoneyFlowTheme.colors.textSecondary else Color.White
+                        Icon(
+                            Icons.Outlined.CalendarToday,
+                            contentDescription = null,
+                            tint = fg,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = pickedLabel,
@@ -796,10 +675,10 @@ fun MonthTransactionsLedgerCard(
                 }
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (selectedDayKey == "ALL") Heat500 else Heat50,
+                    color = if (selectedDate == null) Heat500 else Heat50,
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { onSelectDayKey("ALL") }
+                        .clickable(onClick = onClearDate)
                 ) {
                     Text(
                         text = "Xem cả tháng",
@@ -807,7 +686,7 @@ fun MonthTransactionsLedgerCard(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
-                        color = if (selectedDayKey == "ALL") Color.White else Heat700,
+                        color = if (selectedDate == null) Color.White else Heat700,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                     )
                 }
@@ -821,112 +700,146 @@ fun MonthTransactionsLedgerCard(
                     },
                     brandColor = Heat500,
                     brandSoftColor = Heat50,
-                    initialDate = java.time.LocalDate.of(year, month, 1)
+                    initialDate = selectedDate ?: LocalDate.of(year, month, 1)
                 )
             }
 
             HorizontalDivider(color = Ink100)
 
-            // Danh sách các giao dịch đã thực hiện trong tháng
-            if (selectedDayKey == "ALL") {
-                // Hiển thị toàn bộ giao dịch nhóm theo từng ngày
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    monthGroups.forEachIndexed { groupIndex, dayGroup ->
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Tiêu đề ngày
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Ink50, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = dayGroup.dateLabel,
-                                        fontFamily = FontCore,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = MoneyFlowTheme.colors.textPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "(${dayGroup.items.size} GD)",
-                                        fontFamily = FontCore,
-                                        fontSize = 11.sp,
-                                        color = MoneyFlowTheme.colors.textSecondary
-                                    )
-                                }
-                                Text(
-                                    text = "-${formatVnd(dayGroup.totalAmount)}",
-                                    fontFamily = FontMono,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = Heat500
-                                )
-                            }
-
-                            // Các giao dịch trong ngày
-                            dayGroup.items.forEach { txn ->
-                                TransactionLedgerItemRow(txn = txn)
-                            }
-                        }
-
-                        if (groupIndex < monthGroups.size - 1) {
-                            DashedDivider(color = Ink100)
-                        }
-                    }
-                }
-            } else {
-                // Hiển thị riêng ngày được chọn
-                val selectedGroup = monthGroups.find { it.dateKey == selectedDayKey }
-                if (selectedGroup == null) {
+            when {
+                isLoading && transactionsData == null -> {
                     Text(
-                        text = "Không có giao dịch nào trong ngày $selectedDayKey",
+                        text = "Đang tải danh sách giao dịch…",
                         fontFamily = FontCore,
                         fontSize = 13.sp,
                         color = MoneyFlowTheme.colors.textSecondary,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // Banner ngày chọn
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Heat50, RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Ngày: ${selectedGroup.dateLabel}",
-                                    fontFamily = FontCore,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = Heat700
-                                )
-                                Text(
-                                    text = "${selectedGroup.items.size} giao dịch đã thực hiện",
-                                    fontFamily = FontCore,
-                                    fontSize = 11.sp,
-                                    color = Heat600
-                                )
-                            }
+                }
+
+                errorMessage != null -> {
+                    ReportInlineError(
+                        message = errorMessage,
+                        onRetry = onRetry
+                    )
+                }
+
+                selectedDate == null -> {
+                    if (monthGroups.isEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                text = "-${formatVnd(selectedGroup.totalAmount)}",
-                                fontFamily = FontMono,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = Heat500
+                                text = "Chưa có giao dịch chi tiêu nào trong tháng $month/$year.",
+                                fontFamily = FontCore,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = MoneyFlowTheme.colors.textPrimary
+                            )
+                            Text(
+                                text = "Bấm nút + để ghi khoản chi đầu tiên của bạn.",
+                                fontFamily = FontCore,
+                                fontSize = 12.sp,
+                                color = MoneyFlowTheme.colors.textSecondary
                             )
                         }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            monthGroups.forEachIndexed { groupIndex, dayGroup ->
+                                val dayLabel = formatDayHeaderLabel(dayGroup.date, today, yesterday)
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Ink50, RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = dayLabel,
+                                                fontFamily = FontCore,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MoneyFlowTheme.colors.textPrimary
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "(${dayGroup.txnCount} GD)",
+                                                fontFamily = FontCore,
+                                                fontSize = 11.sp,
+                                                color = MoneyFlowTheme.colors.textSecondary
+                                            )
+                                        }
+                                        Text(
+                                            text = "−${formatVnd(dayGroup.totalAmount)}",
+                                            fontFamily = FontMono,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = Heat500
+                                        )
+                                    }
 
-                        // Danh sách giao dịch
-                        selectedGroup.items.forEach { txn ->
-                            TransactionLedgerItemRow(txn = txn)
+                                    dayGroup.items.forEach { txn ->
+                                        TransactionLedgerItemRow(txn = txn)
+                                    }
+                                }
+
+                                if (groupIndex < monthGroups.size - 1) {
+                                    DashedDivider(color = Ink100)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                else -> {
+                    val selectedGroup = monthGroups.firstOrNull { it.date == selectedDate }
+                    val dayLabel = formatDayHeaderLabel(selectedDate, today, yesterday)
+                    if (selectedGroup == null || selectedGroup.items.isEmpty()) {
+                        Text(
+                            text = "Không có giao dịch nào trong ngày ${selectedDate.format(REPORT_DAY_FORMATTER)}.",
+                            fontFamily = FontCore,
+                            fontSize = 13.sp,
+                            color = MoneyFlowTheme.colors.textSecondary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Heat50, RoundedCornerShape(12.dp))
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Ngày: $dayLabel",
+                                        fontFamily = FontCore,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Heat700
+                                    )
+                                    Text(
+                                        text = "${selectedGroup.txnCount} giao dịch đã thực hiện",
+                                        fontFamily = FontCore,
+                                        fontSize = 11.sp,
+                                        color = Heat600
+                                    )
+                                }
+                                Text(
+                                    text = "−${formatVnd(selectedGroup.totalAmount)}",
+                                    fontFamily = FontMono,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = Heat500
+                                )
+                            }
+
+                            selectedGroup.items.forEach { txn ->
+                                TransactionLedgerItemRow(txn = txn)
+                            }
                         }
                     }
                 }
@@ -936,7 +849,21 @@ fun MonthTransactionsLedgerCard(
 }
 
 @Composable
-fun TransactionLedgerItemRow(txn: DailyExpenseItem) {
+fun TransactionLedgerItemRow(txn: ReportTransactionItem) {
+    val isIncome = txn.type == "INCOME"
+    val title = txn.merchant?.takeIf { it.isNotBlank() }
+        ?: txn.note?.takeIf { it.isNotBlank() }
+        ?: txn.categoryName
+    val timeText = remember(txn.occurredAt) {
+        txn.occurredAt.atZone(REPORT_ZONE).format(REPORT_TIME_FORMATTER)
+    }
+    val icon = remember(txn.categoryName) {
+        getCategoryIcon(txn.categoryName)
+    }
+    val tint = if (isIncome) Grow500 else Heat500
+    val tileBg = if (isIncome) Grow50 else Heat50
+    val signPrefix = if (isIncome) "+" else "−"
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -951,27 +878,27 @@ fun TransactionLedgerItemRow(txn: DailyExpenseItem) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .background(Heat50, RoundedCornerShape(10.dp)),
+                    .background(tileBg, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = txn.icon,
-                    contentDescription = txn.title,
-                    tint = Heat500,
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = tint,
                     modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column {
                 Text(
-                    text = txn.title,
+                    text = title,
                     fontFamily = FontCore,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
                     color = MoneyFlowTheme.colors.textPrimary
                 )
                 Text(
-                    text = "${txn.category} · ${txn.time} · ${txn.wallet}",
+                    text = "${txn.categoryName} · $timeText · ${txn.walletName}",
                     fontFamily = FontCore,
                     fontSize = 11.sp,
                     color = MoneyFlowTheme.colors.textSecondary
@@ -980,11 +907,11 @@ fun TransactionLedgerItemRow(txn: DailyExpenseItem) {
         }
 
         Text(
-            text = "-${formatVnd(txn.amount)}",
+            text = "$signPrefix${formatVnd(txn.amount)}",
             fontFamily = FontMono,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
-            color = Heat500
+            color = tint
         )
     }
 }
@@ -1046,15 +973,25 @@ fun ExpenseCategoryCard() {
 // -------------------------------------------------------------------------
 
 @Composable
-fun IncomeOverviewCard() {
-    var selectedIncomeType by remember { mutableStateOf("Tất cả nguồn thu") }
-    val incomeTypes = listOf("Tất cả nguồn thu", "Lương", "Thưởng", "Freelance")
+fun IncomeOverviewCard(
+    year: Int,
+    month: Int,
+    selectedCategoryId: String?,
+    selectedCategoryLabel: String,
+    filterOptions: List<IncomeFilterOption>,
+    trendData: MonthlyTrendData?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onSelectCategory: (String?, String) -> Unit,
+    onRetry: () -> Unit
+) {
+    val selectedAmount = trendData?.selectedAmount ?: 0L
+    val previousAmount = trendData?.previousAmount ?: 0L
+    val momChangeAmount = trendData?.momChangeAmount ?: 0L
+    val momChangePercent = trendData?.momChangePercent
 
-    val (currentAmount, currentChange) = when (selectedIncomeType) {
-        "Lương" -> Pair("18.000.000", "98,9%")
-        "Thưởng" -> Pair("200.000", "1,1%")
-        "Freelance" -> Pair("0", "0%")
-        else -> Pair("18.200.000", "5,2%")
+    val barData = remember(trendData, year, month) {
+        buildFiveMonthBarTriples(trendData?.points, year, month)
     }
 
     Surface(
@@ -1095,7 +1032,7 @@ fun IncomeOverviewCard() {
                 }
 
                 Text(
-                    text = "Dòng tiền vào",
+                    text = if (isLoading) "Đang cập nhật…" else "Dòng tiền vào",
                     fontFamily = FontCore,
                     fontSize = 12.sp,
                     color = MoneyFlowTheme.colors.textSecondary
@@ -1111,16 +1048,18 @@ fun IncomeOverviewCard() {
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                incomeTypes.forEach { typeName ->
-                    val isSelected = selectedIncomeType == typeName
+                filterOptions.forEach { option ->
+                    val isSelected = selectedCategoryId == option.categoryId
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = if (isSelected) Grow500 else Ink100,
                         border = if (isSelected) null else BorderStroke(1.dp, Ink200),
-                        modifier = Modifier.clickable { selectedIncomeType = typeName }
+                        modifier = Modifier.clickable {
+                            onSelectCategory(option.categoryId, option.label)
+                        }
                     ) {
                         Text(
-                            text = typeName,
+                            text = option.label,
                             fontFamily = FontCore,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 12.sp,
@@ -1133,15 +1072,24 @@ fun IncomeOverviewCard() {
 
             Spacer(modifier = Modifier.height(18.dp))
 
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             // Phần hiển thị số tiền thu theo loại giao dịch
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (selectedIncomeType == "Tất cả nguồn thu") "Tổng thu tháng này" else "Thu nhập: $selectedIncomeType",
+                        text = if (selectedCategoryId == null) {
+                            "Tổng thu tháng này"
+                        } else {
+                            "Thu nhập: $selectedCategoryLabel"
+                        },
                         fontFamily = FontCore,
                         fontSize = 14.sp,
                         color = MoneyFlowTheme.colors.textSecondary
@@ -1149,7 +1097,7 @@ fun IncomeOverviewCard() {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = currentAmount,
+                            text = formatPlainVndNumber(selectedAmount),
                             fontFamily = FontMono,
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp,
@@ -1167,35 +1115,17 @@ fun IncomeOverviewCard() {
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .background(Grow50, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("▲", fontSize = 9.sp, color = Grow500, fontFamily = FontCore)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = currentChange,
-                        fontFamily = FontMono,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = Grow500
-                    )
-                }
+                MomComparisonBadge(
+                    momChangePercent = momChangePercent,
+                    selectedAmount = selectedAmount
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // 5-Month Income Bar Chart with perfectly horizontal aligned baseline
             FiveMonthBarChart(
-                data = listOf(
-                    Triple("T4", 0.50f, false),
-                    Triple("T5", 0.60f, false),
-                    Triple("T6", 0.55f, false),
-                    Triple("T7", 0.70f, false),
-                    Triple("T8", 0.85f, true)
-                ),
+                data = barData,
                 activeColor = Grow500,
                 inactiveColor = Grow100
             )
@@ -1207,16 +1137,21 @@ fun IncomeOverviewCard() {
             Text(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
-                        append("Thu cố định ")
+                        append("Tháng trước: ")
                     }
                     withStyle(SpanStyle(color = Ink900, fontFamily = FontMono, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
-                        append("18,0tr")
+                        append(formatVnd(previousAmount))
                     }
                     withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
-                        append(" · biến động ")
+                        append(" · Chênh lệch: ")
+                    }
+                    val diffPrefix = when {
+                        momChangeAmount > 0L -> "+"
+                        momChangeAmount < 0L -> "−"
+                        else -> ""
                     }
                     withStyle(SpanStyle(color = Ink900, fontFamily = FontMono, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
-                        append("200k")
+                        append("$diffPrefix${formatVnd(kotlin.math.abs(momChangeAmount))}")
                     }
                 }
             )
@@ -1225,7 +1160,55 @@ fun IncomeOverviewCard() {
 }
 
 @Composable
-fun IncomeSourceCard() {
+private fun MomComparisonBadge(
+    momChangePercent: Double?,
+    selectedAmount: Long
+) {
+    val (bgColor, fgColor, arrow, label) = when {
+        momChangePercent == null && selectedAmount > 0L ->
+            MomBadgeStyle(Grow50, Grow500, null, "Mới")
+        momChangePercent == null || momChangePercent == 0.0 ->
+            MomBadgeStyle(Ink100, MoneyFlowTheme.colors.textSecondary, null, "0%")
+        momChangePercent > 0.0 ->
+            MomBadgeStyle(Grow50, Grow500, "▲", "${formatPercentVi(momChangePercent)}%")
+        else ->
+            MomBadgeStyle(Heat50, Heat500, "▼", "${formatPercentVi(kotlin.math.abs(momChangePercent))}%")
+    }
+
+    Row(
+        modifier = Modifier
+            .background(bgColor, RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (arrow != null) {
+            Text(arrow, fontSize = 9.sp, color = fgColor, fontFamily = FontCore)
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        Text(
+            text = label,
+            fontFamily = FontMono,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            color = fgColor
+        )
+    }
+}
+
+private data class MomBadgeStyle(
+    val bg: Color,
+    val fg: Color,
+    val arrow: String?,
+    val label: String
+)
+
+@Composable
+fun IncomeSourceCard(
+    month: Int,
+    year: Int,
+    breakdown: List<CategoryBreakdownItem>,
+    isLoading: Boolean
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1237,35 +1220,129 @@ fun IncomeSourceCard() {
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            CategoryProgressItem(
-                title = "Lương (Thu định kỳ)",
-                amount = "18.000.000₫",
-                percent = "98,9%",
-                progress = 0.989f,
-                progressColor = Grow500,
-                trendText = "đều đặn 6 tháng · Loại: Thu nhập cố định",
-                trendUp = null
-            )
-
-            CategoryProgressItem(
-                title = "Thưởng (Thu bổ sung)",
-                amount = "200.000₫",
-                percent = "1,1%",
-                progress = 0.12f,
-                progressColor = Grow200,
-                trendText = "Loại: Thu nhập biến động"
-            )
-
-            CategoryProgressItem(
-                title = "Freelance (Thu ngoài)",
-                amount = "0₫",
-                percent = "0%",
-                progress = 0.0f,
-                progressColor = Ink200,
-                trendText = "chưa có tháng này · Loại: Dự án tự do",
-                trendUp = null
-            )
+            if (breakdown.isEmpty()) {
+                Text(
+                    text = if (isLoading) {
+                        "Đang tải cơ cấu nguồn thu…"
+                    } else {
+                        "Chưa có khoản thu nào trong tháng $month/$year."
+                    },
+                    fontFamily = FontCore,
+                    fontSize = 13.sp,
+                    color = MoneyFlowTheme.colors.textSecondary
+                )
+            } else {
+                breakdown.forEachIndexed { index, item ->
+                    val share = item.sharePercent ?: 0.0
+                    val mom = item.momChangePercent
+                    val trendText = buildString {
+                        append("${item.txnCount} giao dịch")
+                        if (mom != null) {
+                            append(" · ${formatPercentVi(kotlin.math.abs(mom))}% so với tháng trước")
+                        } else if (item.totalAmount > 0L) {
+                            append(" · Mới trong tháng này")
+                        }
+                    }
+                    val trendUp = when {
+                        mom == null || mom == 0.0 -> null
+                        else -> mom > 0.0
+                    }
+                    CategoryProgressItem(
+                        title = item.categoryName,
+                        amount = formatVnd(item.totalAmount),
+                        percent = "${formatPercentVi(share)}%",
+                        progress = (share / 100.0).toFloat().coerceIn(0f, 1f),
+                        progressColor = if (index == 0) Grow500 else Grow200,
+                        trendText = trendText,
+                        trendUp = trendUp
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun ReportInlineError(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Heat50, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = message,
+            fontFamily = FontCore,
+            fontSize = 12.sp,
+            color = Heat700,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Thử lại",
+            fontFamily = FontCore,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            color = Heat600,
+            modifier = Modifier
+                .clickable(onClick = onRetry)
+                .padding(4.dp)
+        )
+    }
+}
+
+private fun buildFiveMonthBarTriples(
+    points: List<MonthlyBarPoint>?,
+    year: Int,
+    month: Int
+): List<Triple<String, Float, Boolean>> {
+    if (points.isNullOrEmpty()) {
+        val baseYm = YearMonth.of(year, month)
+        return (4 downTo 0).map { offset ->
+            val ym = baseYm.minusMonths(offset.toLong())
+            Triple("T${ym.monthValue}", 0f, offset == 0)
+        }
+    }
+    val maxAmount = points.maxOfOrNull { it.totalAmount } ?: 0L
+    return points.map { p ->
+        // Chi doi sang Float o buoc ve cuoi cung; tranh chia 0 khi ca 5 thang deu bang 0
+        val fraction = if (maxAmount > 0L) {
+            (p.totalAmount.toFloat() / maxAmount.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        Triple("T${p.month}", fraction, p.isSelected)
+    }
+}
+
+private fun formatDayHeaderLabel(
+    date: LocalDate,
+    today: LocalDate,
+    yesterday: LocalDate
+): String {
+    val ddMm = date.format(REPORT_DAY_FORMATTER)
+    return when (date) {
+        today -> "Hôm nay ($ddMm)"
+        yesterday -> "Hôm qua ($ddMm)"
+        else -> ddMm
+    }
+}
+
+private fun formatPlainVndNumber(amount: Long): String {
+    return kotlin.math.abs(amount).toString().reversed().chunked(3).joinToString(".").reversed()
+}
+
+private fun formatPercentVi(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    return if (rounded % 1.0 == 0.0) {
+        rounded.toLong().toString()
+    } else {
+        String.format(Locale.US, "%.1f", rounded).replace('.', ',')
     }
 }
 
