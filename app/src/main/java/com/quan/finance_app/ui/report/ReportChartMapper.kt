@@ -1,8 +1,18 @@
 package com.quan.finance_app.ui.report
 
 import com.quan.finance_app.data.MonthlyBarPoint
+import com.quan.finance_app.data.MonthlyTrendData
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.Locale
+import kotlin.math.abs
+
+data class DualBarData(
+    val label: String,
+    val inFraction: Float,
+    val outFraction: Float,
+    val isCurrent: Boolean
+)
 
 /**
  * Chuẩn hoá dữ liệu 5 tháng kết thúc ở (year, month) sang danh sách (nhãn, tỉ lệ [0..1], là tháng chọn).
@@ -64,4 +74,63 @@ fun forecastMonthEnd(
     if (ym != YearMonth.from(today)) return null
     val avg = averagePerDay(total, ym, today)
     return avg * ym.lengthOfMonth()
+}
+
+/**
+ * Ghép 2 chuỗi 5 tháng (Thu & Chi) kết thúc ở (year, month) thành 5 cặp cột Vào/Ra,
+ * chuẩn hoá theo giá trị lớn nhất chung của cả 2 chuỗi; tháng thiếu dữ liệu tính là 0.
+ */
+fun buildFiveMonthDualBars(
+    incomePoints: List<MonthlyBarPoint>?,
+    expensePoints: List<MonthlyBarPoint>?,
+    year: Int,
+    month: Int
+): List<DualBarData> {
+    val baseYm = YearMonth.of(year, month)
+    val incomeByPeriod = incomePoints?.associateBy { it.period } ?: emptyMap()
+    val expenseByPeriod = expensePoints?.associateBy { it.period } ?: emptyMap()
+
+    val rawWindow = (4 downTo 0).map { offset ->
+        val ym = baseYm.minusMonths(offset.toLong())
+        val period = String.format(Locale.ROOT, "%04d-%02d", ym.year, ym.monthValue)
+        val inAmount = (incomeByPeriod[period]?.totalAmount ?: 0L).coerceAtLeast(0L)
+        val outAmount = (expenseByPeriod[period]?.totalAmount ?: 0L).coerceAtLeast(0L)
+        Triple(ym, inAmount to outAmount, offset == 0)
+    }
+
+    val maxAmount = rawWindow.maxOfOrNull { maxOf(it.second.first, it.second.second) } ?: 0L
+    return rawWindow.map { (ym, amounts, isCurrent) ->
+        val (inAmount, outAmount) = amounts
+        val inFraction = if (maxAmount > 0L) {
+            (inAmount.toFloat() / maxAmount.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        val outFraction = if (maxAmount > 0L) {
+            (outAmount.toFloat() / maxAmount.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        DualBarData(
+            label = "T${ym.monthValue}",
+            inFraction = inFraction,
+            outFraction = outFraction,
+            isCurrent = isCurrent
+        )
+    }
+}
+
+/**
+ * % thay đổi dòng tiền ròng so với tháng liền trước.
+ * Trả null khi chưa có dữ liệu hoặc ròng tháng trước = 0 (D5).
+ */
+fun netMomPercent(
+    incomeTrend: MonthlyTrendData?,
+    expenseTrend: MonthlyTrendData?
+): Double? {
+    if (incomeTrend == null && expenseTrend == null) return null
+    val currentNet = (incomeTrend?.selectedAmount ?: 0L) - (expenseTrend?.selectedAmount ?: 0L)
+    val previousNet = (incomeTrend?.previousAmount ?: 0L) - (expenseTrend?.previousAmount ?: 0L)
+    if (previousNet == 0L) return null
+    return ((currentNet - previousNet).toDouble() / abs(previousNet).toDouble()) * 100.0
 }

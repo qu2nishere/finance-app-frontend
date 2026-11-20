@@ -50,12 +50,15 @@ import com.quan.finance_app.data.MonthlyTransactionsData
 import com.quan.finance_app.data.MonthlyTrendData
 import com.quan.finance_app.data.ReportTransactionItem
 import com.quan.finance_app.ui.components.core.MfTabHeader
+import com.quan.finance_app.ui.report.DualBarData
 import com.quan.finance_app.ui.report.IncomeFilterOption
 import com.quan.finance_app.ui.report.ReportUiState
 import com.quan.finance_app.ui.report.ReportViewModel
 import com.quan.finance_app.ui.report.averagePerDay
 import com.quan.finance_app.ui.report.buildFiveMonthBarTriples
+import com.quan.finance_app.ui.report.buildFiveMonthDualBars
 import com.quan.finance_app.ui.report.forecastMonthEnd
+import com.quan.finance_app.ui.report.netMomPercent
 import com.quan.finance_app.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -67,13 +70,6 @@ import java.util.Locale
 private val REPORT_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
 private val REPORT_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val REPORT_ZONE: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
-
-data class DualBarData(
-    val label: String,
-    val inFraction: Float,
-    val outFraction: Float,
-    val isCurrent: Boolean
-)
 
 @Composable
 fun ReportRoute(
@@ -251,7 +247,15 @@ fun ReportScreen(
             // TAB 3: DÒNG TIỀN
             2 -> {
                 item {
-                    CashflowOverviewCard()
+                    CashflowOverviewCard(
+                        incomeTrend = state.cashflowIncomeTrend,
+                        expenseTrend = state.expenseTrend,
+                        year = currentYear,
+                        month = currentMonth,
+                        isLoading = state.isCashflowIncomeLoading || state.isExpenseTrendLoading,
+                        errorMessage = state.cashflowIncomeError ?: state.expenseTrendError,
+                        onRetry = onRefresh
+                    )
                 }
 
                 item {
@@ -1109,9 +1113,9 @@ fun IncomeOverviewCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (selectedCategoryId == null) {
-                            "Tổng thu tháng này"
+                            "Tổng thu tháng $month"
                         } else {
-                            "Thu nhập: $selectedCategoryLabel"
+                            "Thu nhập tháng $month: $selectedCategoryLabel"
                         },
                         fontFamily = FontCore,
                         fontSize = 14.sp,
@@ -1286,7 +1290,7 @@ fun IncomeSourceCard(
                         if (mom != null) {
                             append(" · ${formatPercentVi(kotlin.math.abs(mom))}% so với tháng trước")
                         } else if (item.totalAmount > 0L) {
-                            append(" · Mới trong tháng này")
+                            append(" · Mới trong tháng $month")
                         }
                     }
                     val trendUp = when {
@@ -1472,7 +1476,40 @@ fun SavingsRateCard() {
 // -------------------------------------------------------------------------
 
 @Composable
-fun CashflowOverviewCard() {
+fun CashflowOverviewCard(
+    incomeTrend: MonthlyTrendData?,
+    expenseTrend: MonthlyTrendData?,
+    year: Int,
+    month: Int,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit
+) {
+    val incomeAmount = incomeTrend?.selectedAmount ?: 0L
+    val expenseAmount = expenseTrend?.selectedAmount ?: 0L
+    val netAmount = incomeAmount - expenseAmount
+    val netPrefix = when {
+        netAmount > 0L -> "+"
+        netAmount < 0L -> "−"
+        else -> ""
+    }
+    val netColor = when {
+        netAmount > 0L -> Grow500
+        netAmount < 0L -> Heat500
+        else -> MoneyFlowTheme.colors.textPrimary
+    }
+    val momPercent = remember(incomeTrend, expenseTrend) {
+        netMomPercent(incomeTrend, expenseTrend)
+    }
+    val dualBars = remember(incomeTrend, expenseTrend, year, month) {
+        buildFiveMonthDualBars(
+            incomePoints = incomeTrend?.points,
+            expensePoints = expenseTrend?.points,
+            year = year,
+            month = month
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1483,26 +1520,42 @@ fun CashflowOverviewCard() {
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
-                    Text(
-                        text = "Dòng tiền ròng tháng 8",
-                        fontFamily = FontCore,
-                        fontSize = 14.sp,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Dòng tiền ròng tháng $month",
+                            fontFamily = FontCore,
+                            fontSize = 14.sp,
+                            color = MoneyFlowTheme.colors.textSecondary
+                        )
+                        if (isLoading && incomeTrend == null && expenseTrend == null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang tải…",
+                                fontFamily = FontCore,
+                                fontSize = 12.sp,
+                                color = MoneyFlowTheme.colors.textSecondary
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "+8.488.000",
+                            text = "$netPrefix${formatPlainVndNumber(netAmount)}",
                             fontFamily = FontMono,
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp,
-                            color = Grow500,
+                            color = netColor,
                             letterSpacing = (-0.5).sp
                         )
                         Text(
@@ -1510,42 +1563,24 @@ fun CashflowOverviewCard() {
                             fontFamily = FontCore,
                             fontWeight = FontWeight.Bold,
                             fontSize = 24.sp,
-                            color = Grow500,
+                            color = netColor,
                             modifier = Modifier.padding(bottom = 3.dp, start = 1.dp)
                         )
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .background(Grow50, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("▲", fontSize = 9.sp, color = Grow500, fontFamily = FontCore)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "14%",
-                        fontFamily = FontMono,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = Grow500
-                    )
-                }
+                MomComparisonBadge(
+                    momChangePercent = momPercent,
+                    selectedAmount = netAmount,
+                    higherIsBetter = true,
+                    showNewWhenNull = false
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Dual Bar Chart (Vào vs Ra) with perfectly aligned bottom baseline
-            DualMonthlyBarChart(
-                data = listOf(
-                    DualBarData("T4", 0.50f, 0.65f, false),
-                    DualBarData("T5", 0.60f, 0.45f, false),
-                    DualBarData("T6", 0.55f, 0.75f, false),
-                    DualBarData("T7", 0.70f, 0.85f, false),
-                    DualBarData("T8", 0.88f, 0.82f, true)
-                )
-            )
+            DualMonthlyBarChart(data = dualBars)
 
             Spacer(modifier = Modifier.height(16.dp))
 
