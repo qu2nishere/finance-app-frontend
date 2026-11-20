@@ -53,6 +53,9 @@ import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.report.IncomeFilterOption
 import com.quan.finance_app.ui.report.ReportUiState
 import com.quan.finance_app.ui.report.ReportViewModel
+import com.quan.finance_app.ui.report.averagePerDay
+import com.quan.finance_app.ui.report.buildFiveMonthBarTriples
+import com.quan.finance_app.ui.report.forecastMonthEnd
 import com.quan.finance_app.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -143,7 +146,14 @@ fun ReportScreen(
             // TAB 1: CHI TIÊU
             0 -> {
                 item {
-                    ExpenseOverviewCard()
+                    ExpenseOverviewCard(
+                        trend = state.expenseTrend,
+                        year = currentYear,
+                        month = currentMonth,
+                        isLoading = state.isExpenseTrendLoading,
+                        errorMessage = state.expenseTrendError,
+                        onRetry = onRefresh
+                    )
                 }
 
                 // Danh sách toàn bộ giao dịch đã thực hiện trong tháng kèm bộ lọc ngày
@@ -435,7 +445,28 @@ fun ReportTabs(
 // -------------------------------------------------------------------------
 
 @Composable
-fun ExpenseOverviewCard() {
+fun ExpenseOverviewCard(
+    trend: MonthlyTrendData?,
+    year: Int,
+    month: Int,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit
+) {
+    val selectedAmount = trend?.selectedAmount ?: 0L
+    val momChangePercent = trend?.momChangePercent
+    val today = remember { LocalDate.now(REPORT_ZONE) }
+    val selectedYm = remember(year, month) { YearMonth.of(year, month) }
+    val avgPerDay = remember(selectedAmount, selectedYm, today) {
+        averagePerDay(selectedAmount, selectedYm, today)
+    }
+    val forecast = remember(selectedAmount, selectedYm, today) {
+        forecastMonthEnd(selectedAmount, selectedYm, today)
+    }
+    val barData = remember(trend, year, month) {
+        buildFiveMonthBarTriples(trend?.points, year, month)
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -446,22 +477,38 @@ fun ExpenseOverviewCard() {
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
-                    Text(
-                        text = "Tổng chi tháng này",
-                        fontFamily = FontCore,
-                        fontSize = 14.sp,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Tổng chi tháng $month",
+                            fontFamily = FontCore,
+                            fontSize = 14.sp,
+                            color = MoneyFlowTheme.colors.textSecondary
+                        )
+                        if (isLoading && trend == null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang tải…",
+                                fontFamily = FontCore,
+                                fontSize = 12.sp,
+                                color = MoneyFlowTheme.colors.textSecondary
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "9.712.000",
+                            text = formatPlainVndNumber(selectedAmount),
                             fontFamily = FontMono,
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp,
@@ -479,40 +526,18 @@ fun ExpenseOverviewCard() {
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .background(Grow50, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "▼",
-                        fontSize = 9.sp,
-                        color = Grow500,
-                        fontFamily = FontCore
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "4,1%",
-                        fontFamily = FontMono,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = Grow500
-                    )
-                }
+                MomComparisonBadge(
+                    momChangePercent = momChangePercent,
+                    selectedAmount = selectedAmount,
+                    higherIsBetter = false
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // 5-Month Expense Bar Chart with perfectly horizontal aligned baseline
             FiveMonthBarChart(
-                data = listOf(
-                    Triple("T4", 0.48f, false),
-                    Triple("T5", 0.36f, false),
-                    Triple("T6", 0.68f, false),
-                    Triple("T7", 0.82f, false),
-                    Triple("T8", 0.74f, true)
-                ),
+                data = barData,
                 activeColor = Heat500,
                 inactiveColor = Heat100
             )
@@ -527,13 +552,15 @@ fun ExpenseOverviewCard() {
                         append("Trung bình 1 ngày: ")
                     }
                     withStyle(SpanStyle(color = Ink900, fontFamily = FontMono, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
-                        append("313.000₫")
+                        append(formatVnd(avgPerDay))
                     }
-                    withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
-                        append(" · Dự báo cuối tháng: ")
-                    }
-                    withStyle(SpanStyle(color = Ink900, fontFamily = FontCore, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
-                        append("10,4tr")
+                    if (forecast != null) {
+                        withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
+                            append(" · Dự báo cuối tháng: ")
+                        }
+                        withStyle(SpanStyle(color = Ink900, fontFamily = FontMono, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
+                            append(formatVnd(forecast))
+                        }
                     }
                 }
             )
@@ -1158,18 +1185,41 @@ fun IncomeOverviewCard(
 @Composable
 private fun MomComparisonBadge(
     momChangePercent: Double?,
-    selectedAmount: Long
+    selectedAmount: Long,
+    higherIsBetter: Boolean = true,
+    showNewWhenNull: Boolean = true
 ) {
-    val (bgColor, fgColor, arrow, label) = when {
-        momChangePercent == null && selectedAmount > 0L ->
-            MomBadgeStyle(Grow50, Grow500, null, "Mới")
-        momChangePercent == null || momChangePercent == 0.0 ->
+    val style = when {
+        momChangePercent == null && selectedAmount != 0L && showNewWhenNull -> {
+            if (higherIsBetter) {
+                MomBadgeStyle(Grow50, Grow500, null, "Mới")
+            } else {
+                MomBadgeStyle(Heat50, Heat500, null, "Mới")
+            }
+        }
+        momChangePercent == null -> return
+        momChangePercent == 0.0 ->
             MomBadgeStyle(Ink100, MoneyFlowTheme.colors.textSecondary, null, "0%")
-        momChangePercent > 0.0 ->
-            MomBadgeStyle(Grow50, Grow500, "▲", "${formatPercentVi(momChangePercent)}%")
-        else ->
-            MomBadgeStyle(Heat50, Heat500, "▼", "${formatPercentVi(kotlin.math.abs(momChangePercent))}%")
+        momChangePercent > 0.0 -> {
+            val isGood = higherIsBetter
+            MomBadgeStyle(
+                bg = if (isGood) Grow50 else Heat50,
+                fg = if (isGood) Grow500 else Heat500,
+                arrow = "▲",
+                label = "${formatPercentVi(momChangePercent)}%"
+            )
+        }
+        else -> {
+            val isGood = !higherIsBetter
+            MomBadgeStyle(
+                bg = if (isGood) Grow50 else Heat50,
+                fg = if (isGood) Grow500 else Heat500,
+                arrow = "▼",
+                label = "${formatPercentVi(kotlin.math.abs(momChangePercent))}%"
+            )
+        }
     }
+    val (bgColor, fgColor, arrow, label) = style
 
     Row(
         modifier = Modifier
@@ -1289,30 +1339,6 @@ private fun ReportInlineError(
                 .clickable(onClick = onRetry)
                 .padding(4.dp)
         )
-    }
-}
-
-private fun buildFiveMonthBarTriples(
-    points: List<MonthlyBarPoint>?,
-    year: Int,
-    month: Int
-): List<Triple<String, Float, Boolean>> {
-    if (points.isNullOrEmpty()) {
-        val baseYm = YearMonth.of(year, month)
-        return (4 downTo 0).map { offset ->
-            val ym = baseYm.minusMonths(offset.toLong())
-            Triple("T${ym.monthValue}", 0f, offset == 0)
-        }
-    }
-    val maxAmount = points.maxOfOrNull { it.totalAmount } ?: 0L
-    return points.map { p ->
-        // Chi doi sang Float o buoc ve cuoi cung; tranh chia 0 khi ca 5 thang deu bang 0
-        val fraction = if (maxAmount > 0L) {
-            (p.totalAmount.toFloat() / maxAmount.toFloat()).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-        Triple("T${p.month}", fraction, p.isSelected)
     }
 }
 
