@@ -40,7 +40,8 @@ data class ReportUiState(
     val isTrendLoading: Boolean = false,
     val isTransactionsLoading: Boolean = false,
     val trendError: String? = null,
-    val transactionsError: String? = null
+    val transactionsError: String? = null,
+    val canGoNext: Boolean = false
 ) {
     val periodKey: String
         get() = String.format(Locale.ROOT, "%04d-%02d", year, month)
@@ -61,13 +62,15 @@ data class ReportUiState(
 class ReportViewModel(
     private val reportRepository: ReportRepository = ServiceLocator.reportRepository,
     initialYearMonth: YearMonth = YearMonth.now(ReportUiState.USER_ZONE),
-    autoLoadOnInit: Boolean = true
+    autoLoadOnInit: Boolean = true,
+    private val currentYearMonthProvider: () -> YearMonth = { YearMonth.now(ReportUiState.USER_ZONE) }
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
         ReportUiState(
             year = initialYearMonth.year,
-            month = initialYearMonth.monthValue
+            month = initialYearMonth.monthValue,
+            canGoNext = initialYearMonth.isBefore(currentYearMonthProvider())
         )
     )
     val state: StateFlow<ReportUiState> = _state.asStateFlow()
@@ -89,11 +92,13 @@ class ReportViewModel(
     fun goPreviousMonth() {
         val current = _state.value
         val prev = YearMonth.of(current.year, current.month).minusMonths(1)
+        val nowYm = currentYearMonthProvider()
         _state.update {
             it.copy(
                 year = prev.year,
                 month = prev.monthValue,
-                selectedDate = null
+                selectedDate = null,
+                canGoNext = prev.isBefore(nowYm)
             )
         }
         refresh()
@@ -101,12 +106,16 @@ class ReportViewModel(
 
     fun goNextMonth() {
         val current = _state.value
-        val next = YearMonth.of(current.year, current.month).plusMonths(1)
+        val currentYm = YearMonth.of(current.year, current.month)
+        val nowYm = currentYearMonthProvider()
+        if (!currentYm.isBefore(nowYm)) return
+        val next = currentYm.plusMonths(1)
         _state.update {
             it.copy(
                 year = next.year,
                 month = next.monthValue,
-                selectedDate = null
+                selectedDate = null,
+                canGoNext = next.isBefore(nowYm)
             )
         }
         refresh()
@@ -129,11 +138,13 @@ class ReportViewModel(
         val targetYm = YearMonth.from(date)
         val currentYm = YearMonth.of(current.year, current.month)
         if (targetYm != currentYm) {
+            val nowYm = currentYearMonthProvider()
             _state.update {
                 it.copy(
                     year = targetYm.year,
                     month = targetYm.monthValue,
-                    selectedDate = date
+                    selectedDate = date,
+                    canGoNext = targetYm.isBefore(nowYm)
                 )
             }
             refresh()

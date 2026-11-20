@@ -123,9 +123,9 @@ fun ReportScreen(
             MonthSelectorHeader(
                 month = currentMonth,
                 year = currentYear,
+                canGoNext = state.canGoNext,
                 onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth,
-                showMonthPicker = selectedTab != 0
+                onNextMonth = onNextMonth
             )
         }
 
@@ -166,8 +166,6 @@ fun ReportScreen(
                         transactionsData = state.expenseTransactions,
                         isLoading = state.isTransactionsLoading,
                         errorMessage = state.transactionsError,
-                        onPreviousMonth = onPreviousMonth,
-                        onNextMonth = onNextMonth,
                         onPickDate = onPickDate,
                         onClearDate = onClearDate,
                         onRetry = onRefresh
@@ -312,14 +310,18 @@ fun ReportScreen(
 fun MonthSelectorHeader(
     month: Int,
     year: Int,
+    canGoNext: Boolean = true,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
-    showMonthPicker: Boolean = true
+    onNextMonth: () -> Unit
 ) {
     MfTabHeader(title = "Thống kê") {
-        if (showMonthPicker) {
-            MonthStepper(month, year, onPreviousMonth, onNextMonth)
-        }
+        MonthStepper(
+            month = month,
+            year = year,
+            canGoNext = canGoNext,
+            onPreviousMonth = onPreviousMonth,
+            onNextMonth = onNextMonth
+        )
     }
 }
 
@@ -330,6 +332,7 @@ fun MonthStepper(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     modifier: Modifier = Modifier,
+    canGoNext: Boolean = true,
     fillWidth: Boolean = false
 ) {
     Row(
@@ -352,11 +355,19 @@ fun MonthStepper(
             fontSize = 14.sp,
             color = MoneyFlowTheme.colors.textPrimary
         )
-        IconButton(onClick = onNextMonth, modifier = Modifier.size(32.dp)) {
+        IconButton(
+            onClick = onNextMonth,
+            enabled = canGoNext,
+            modifier = Modifier.size(32.dp)
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = "Tháng sau",
-                tint = MoneyFlowTheme.colors.textSecondary,
+                tint = if (canGoNext) {
+                    MoneyFlowTheme.colors.textSecondary
+                } else {
+                    MoneyFlowTheme.colors.textSecondary.copy(alpha = 0.3f)
+                },
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -542,8 +553,6 @@ fun MonthTransactionsLedgerCard(
     transactionsData: MonthlyTransactionsData?,
     isLoading: Boolean,
     errorMessage: String?,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
     onPickDate: (LocalDate) -> Unit,
     onClearDate: () -> Unit,
     onRetry: () -> Unit
@@ -619,20 +628,7 @@ fun MonthTransactionsLedgerCard(
                 }
             }
 
-            // Lớp lọc 1: theo tháng - tràn hết một hàng
-            MonthStepper(
-                month = month,
-                year = year,
-                onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Ink50, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                fillWidth = true
-            )
-
-            // Lớp lọc 2: theo ngày (date picker) trong tháng đã chọn, kèm nút xem cả tháng
+            // Bộ lọc theo ngày (date picker) trong tháng đã chọn, kèm nút xem cả tháng
             var showDatePicker by remember { mutableStateOf(false) }
             val pickedLabel = if (selectedDate == null) {
                 "Chọn ngày"
