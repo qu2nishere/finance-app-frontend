@@ -1,6 +1,7 @@
 package com.quan.finance_app.data
 
 import com.google.gson.Gson
+import com.quan.finance_app.data.remote.CashflowSummaryDto
 import com.quan.finance_app.data.remote.CategoryBreakdownItemDto
 import com.quan.finance_app.data.remote.DailyTransactionGroupDto
 import com.quan.finance_app.data.remote.MonthlyBarPointDto
@@ -9,6 +10,7 @@ import com.quan.finance_app.data.remote.MonthlyTrendDto
 import com.quan.finance_app.data.remote.ProblemDetailDto
 import com.quan.finance_app.data.remote.ReportApi
 import com.quan.finance_app.data.remote.ReportTransactionItemDto
+import com.quan.finance_app.data.remote.WalletCashflowItemDto
 import kotlinx.coroutines.CancellationException
 import retrofit2.Response
 import java.io.IOException
@@ -90,6 +92,30 @@ data class MonthlyTransactionsData(
     val days: List<DailyTransactionGroup>
 )
 
+data class WalletCashflowItem(
+    val walletId: String,
+    val walletName: String,
+    val walletKind: String,
+    val color: String?,
+    val accountMask: String?,
+    val openingBalance: Long,
+    val totalIncome: Long,
+    val totalExpense: Long,
+    val netFlow: Long,
+    val closingBalance: Long,
+    val includeInTotal: Boolean
+)
+
+data class CashflowSummaryData(
+    val period: String,
+    val currencyCode: String,
+    val openingBalance: Long,
+    val totalIncome: Long,
+    val totalExpense: Long,
+    val closingBalance: Long,
+    val wallets: List<WalletCashflowItem>
+)
+
 /**
  * Tầng duy nhất gọi ReportApi, bắt IOException, dịch ProblemDetail và chuyển chuỗi ngày/giờ
  * sang java.time để UI/ViewModel không chạm vào package data.remote.
@@ -127,6 +153,14 @@ open class ReportRepository(private val api: ReportApi? = null) {
                     categoryId = categoryId
                 )
             },
+            mapper = { it.toDomain() }
+        )
+    }
+
+    open suspend fun getCashflowSummary(period: String): ReportResult<CashflowSummaryData> {
+        val client = requireNotNull(api) { "ReportApi chưa được khởi tạo" }
+        return execute(
+            request = { client.getCashflowSummary(period = period) },
             mapper = { it.toDomain() }
         )
     }
@@ -250,3 +284,27 @@ private fun ReportTransactionItemDto.toDomain(fallbackDate: LocalDate): ReportTr
         note = note
     )
 }
+
+private fun CashflowSummaryDto.toDomain(): CashflowSummaryData = CashflowSummaryData(
+    period = period,
+    currencyCode = currencyCode ?: "VND",
+    openingBalance = openingBalance,
+    totalIncome = totalIncome,
+    totalExpense = totalExpense,
+    closingBalance = closingBalance,
+    wallets = (wallets ?: emptyList()).map(WalletCashflowItemDto::toDomain)
+)
+
+private fun WalletCashflowItemDto.toDomain(): WalletCashflowItem = WalletCashflowItem(
+    walletId = walletId,
+    walletName = walletName,
+    walletKind = walletKind,
+    color = color,
+    accountMask = accountMask,
+    openingBalance = openingBalance,
+    totalIncome = totalIncome,
+    totalExpense = totalExpense,
+    netFlow = netFlow,
+    closingBalance = closingBalance,
+    includeInTotal = includeInTotal
+)

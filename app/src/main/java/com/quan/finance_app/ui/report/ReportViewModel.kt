@@ -2,6 +2,7 @@ package com.quan.finance_app.ui.report
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.quan.finance_app.data.CashflowSummaryData
 import com.quan.finance_app.data.CategoryBreakdownItem
 import com.quan.finance_app.data.MonthlyTransactionsData
 import com.quan.finance_app.data.MonthlyTrendData
@@ -34,13 +35,23 @@ data class ReportUiState(
     val selectedIncomeCategoryLabel: String = ALL_INCOME_LABEL,
     val selectedDate: LocalDate? = null,
     val incomeTrend: MonthlyTrendData? = null,
+    val expenseTrend: MonthlyTrendData? = null,
+    val cashflowIncomeTrend: MonthlyTrendData? = null,
+    val cashflowSummary: CashflowSummaryData? = null,
     val incomeFilterOptions: List<IncomeFilterOption> = DEFAULT_INCOME_OPTIONS,
     val categoryBreakdown: List<CategoryBreakdownItem> = emptyList(),
     val expenseTransactions: MonthlyTransactionsData? = null,
     val isTrendLoading: Boolean = false,
+    val isExpenseTrendLoading: Boolean = false,
+    val isCashflowIncomeLoading: Boolean = false,
+    val isCashflowLoading: Boolean = false,
     val isTransactionsLoading: Boolean = false,
     val trendError: String? = null,
-    val transactionsError: String? = null
+    val expenseTrendError: String? = null,
+    val cashflowIncomeError: String? = null,
+    val cashflowError: String? = null,
+    val transactionsError: String? = null,
+    val canGoNext: Boolean = false
 ) {
     val periodKey: String
         get() = String.format(Locale.ROOT, "%04d-%02d", year, month)
@@ -61,13 +72,15 @@ data class ReportUiState(
 class ReportViewModel(
     private val reportRepository: ReportRepository = ServiceLocator.reportRepository,
     initialYearMonth: YearMonth = YearMonth.now(ReportUiState.USER_ZONE),
-    autoLoadOnInit: Boolean = true
+    autoLoadOnInit: Boolean = true,
+    private val currentYearMonthProvider: () -> YearMonth = { YearMonth.now(ReportUiState.USER_ZONE) }
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
         ReportUiState(
             year = initialYearMonth.year,
-            month = initialYearMonth.monthValue
+            month = initialYearMonth.monthValue,
+            canGoNext = initialYearMonth.isBefore(currentYearMonthProvider())
         )
     )
     val state: StateFlow<ReportUiState> = _state.asStateFlow()
@@ -89,11 +102,13 @@ class ReportViewModel(
     fun goPreviousMonth() {
         val current = _state.value
         val prev = YearMonth.of(current.year, current.month).minusMonths(1)
+        val nowYm = currentYearMonthProvider()
         _state.update {
             it.copy(
                 year = prev.year,
                 month = prev.monthValue,
-                selectedDate = null
+                selectedDate = null,
+                canGoNext = prev.isBefore(nowYm)
             )
         }
         refresh()
@@ -101,12 +116,16 @@ class ReportViewModel(
 
     fun goNextMonth() {
         val current = _state.value
-        val next = YearMonth.of(current.year, current.month).plusMonths(1)
+        val currentYm = YearMonth.of(current.year, current.month)
+        val nowYm = currentYearMonthProvider()
+        if (!currentYm.isBefore(nowYm)) return
+        val next = currentYm.plusMonths(1)
         _state.update {
             it.copy(
                 year = next.year,
                 month = next.monthValue,
-                selectedDate = null
+                selectedDate = null,
+                canGoNext = next.isBefore(nowYm)
             )
         }
         refresh()
@@ -129,11 +148,13 @@ class ReportViewModel(
         val targetYm = YearMonth.from(date)
         val currentYm = YearMonth.of(current.year, current.month)
         if (targetYm != currentYm) {
+            val nowYm = currentYearMonthProvider()
             _state.update {
                 it.copy(
                     year = targetYm.year,
                     month = targetYm.monthValue,
-                    selectedDate = date
+                    selectedDate = date,
+                    canGoNext = targetYm.isBefore(nowYm)
                 )
             }
             refresh()
@@ -156,22 +177,48 @@ class ReportViewModel(
         allJob = viewModelScope.launch {
             val snap = _state.value
             val period = snap.periodKey
+            val needsSeparateCashflowIncome = snap.selectedIncomeCategoryId != null
             _state.update {
                 it.copy(
                     isTrendLoading = true,
+                    isExpenseTrendLoading = true,
+                    isCashflowIncomeLoading = true,
+                    isCashflowLoading = true,
                     isTransactionsLoading = true,
                     trendError = null,
+                    expenseTrendError = null,
+                    cashflowIncomeError = null,
+                    cashflowError = null,
                     transactionsError = null
                 )
             }
             coroutineScope {
-                val trendDeferred = async {
+                val incomeTrendDeferred = async {
                     reportRepository.getMonthlyTrend(
                         period = period,
                         months = 5,
                         type = "INCOME",
                         categoryId = snap.selectedIncomeCategoryId
                     )
+                }
+                val expenseTrendDeferred = async {
+                    reportRepository.getMonthlyTrend(
+                        period = period,
+                        months = 5,
+                        type = "EXPENSE"
+                    )
+                }
+                val cashflowIncomeDeferred = if (needsSeparateCashflowIncome) {
+                    async {
+                        reportRepository.getMonthlyTrend(
+                            period = period,
+                            months = 5,
+                            type = "INCOME",
+                            categoryId = null
+                        )
+                    }
+                } else {
+                    null
                 }
                 val txnDeferred = async {
                     reportRepository.getTransactions(
@@ -180,9 +227,21 @@ class ReportViewModel(
                         type = "EXPENSE"
                     )
                 }
+                val cashflowSummaryDeferred = async {
+                    reportRepository.getCashflowSummary(period = period)
+                }
 
-                applyTrendResult(trendDeferred.await())
-                applyTransactionsResult(txnDeferred.await())
+                applyIncomeTrendResult(
+                    result = incomeTrendDeferred.await(),
+                    expectedPeriod = period,
+                    alsoUpdateCashflow = !needsSeparateCashflowIncome
+                )
+                applyExpenseTrendResult(expenseTrendDeferred.await(), expectedPeriod = period)
+                if (cashflowIncomeDeferred != null) {
+                    applyCashflowIncomeResult(cashflowIncomeDeferred.await(), expectedPeriod = period)
+                }
+                applyCashflowSummaryResult(cashflowSummaryDeferred.await(), expectedPeriod = period)
+                applyTransactionsResult(txnDeferred.await(), expectedPeriod = period)
             }
         }
     }
@@ -191,14 +250,16 @@ class ReportViewModel(
         trendJob?.cancel()
         trendJob = viewModelScope.launch {
             val snap = _state.value
+            val period = snap.periodKey
+            val isUnfiltered = snap.selectedIncomeCategoryId == null
             _state.update { it.copy(isTrendLoading = true, trendError = null) }
             val res = reportRepository.getMonthlyTrend(
-                period = snap.periodKey,
+                period = period,
                 months = 5,
                 type = "INCOME",
                 categoryId = snap.selectedIncomeCategoryId
             )
-            applyTrendResult(res)
+            applyIncomeTrendResult(res, expectedPeriod = period, alsoUpdateCashflow = isUnfiltered)
         }
     }
 
@@ -206,17 +267,23 @@ class ReportViewModel(
         transactionsJob?.cancel()
         transactionsJob = viewModelScope.launch {
             val snap = _state.value
+            val period = snap.periodKey
             _state.update { it.copy(isTransactionsLoading = true, transactionsError = null) }
             val res = reportRepository.getTransactions(
-                period = snap.periodKey,
+                period = period,
                 date = snap.selectedDate,
                 type = "EXPENSE"
             )
-            applyTransactionsResult(res)
+            applyTransactionsResult(res, expectedPeriod = period)
         }
     }
 
-    private fun applyTrendResult(result: ReportResult<MonthlyTrendData>) {
+    private fun applyIncomeTrendResult(
+        result: ReportResult<MonthlyTrendData>,
+        expectedPeriod: String,
+        alsoUpdateCashflow: Boolean
+    ) {
+        if (_state.value.periodKey != expectedPeriod) return
         when (result) {
             is ReportResult.Success -> {
                 val data = result.data
@@ -227,7 +294,10 @@ class ReportViewModel(
                         categoryBreakdown = data.categoryBreakdown,
                         incomeFilterOptions = mergedChips,
                         isTrendLoading = false,
-                        trendError = null
+                        trendError = null,
+                        cashflowIncomeTrend = if (alsoUpdateCashflow) data else it.cashflowIncomeTrend,
+                        isCashflowIncomeLoading = if (alsoUpdateCashflow) false else it.isCashflowIncomeLoading,
+                        cashflowIncomeError = if (alsoUpdateCashflow) null else it.cashflowIncomeError
                     )
                 }
             }
@@ -235,14 +305,98 @@ class ReportViewModel(
                 _state.update {
                     it.copy(
                         isTrendLoading = false,
-                        trendError = result.message
+                        trendError = result.message,
+                        isCashflowIncomeLoading = if (alsoUpdateCashflow) false else it.isCashflowIncomeLoading,
+                        cashflowIncomeError = if (alsoUpdateCashflow) result.message else it.cashflowIncomeError
                     )
                 }
             }
         }
     }
 
-    private fun applyTransactionsResult(result: ReportResult<MonthlyTransactionsData>) {
+    private fun applyExpenseTrendResult(
+        result: ReportResult<MonthlyTrendData>,
+        expectedPeriod: String
+    ) {
+        if (_state.value.periodKey != expectedPeriod) return
+        when (result) {
+            is ReportResult.Success -> {
+                _state.update {
+                    it.copy(
+                        expenseTrend = result.data,
+                        isExpenseTrendLoading = false,
+                        expenseTrendError = null
+                    )
+                }
+            }
+            is ReportResult.Failure -> {
+                _state.update {
+                    it.copy(
+                        isExpenseTrendLoading = false,
+                        expenseTrendError = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyCashflowIncomeResult(
+        result: ReportResult<MonthlyTrendData>,
+        expectedPeriod: String
+    ) {
+        if (_state.value.periodKey != expectedPeriod) return
+        when (result) {
+            is ReportResult.Success -> {
+                _state.update {
+                    it.copy(
+                        cashflowIncomeTrend = result.data,
+                        isCashflowIncomeLoading = false,
+                        cashflowIncomeError = null
+                    )
+                }
+            }
+            is ReportResult.Failure -> {
+                _state.update {
+                    it.copy(
+                        isCashflowIncomeLoading = false,
+                        cashflowIncomeError = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyCashflowSummaryResult(
+        result: ReportResult<CashflowSummaryData>,
+        expectedPeriod: String
+    ) {
+        if (_state.value.periodKey != expectedPeriod) return
+        when (result) {
+            is ReportResult.Success -> {
+                _state.update {
+                    it.copy(
+                        cashflowSummary = result.data,
+                        isCashflowLoading = false,
+                        cashflowError = null
+                    )
+                }
+            }
+            is ReportResult.Failure -> {
+                _state.update {
+                    it.copy(
+                        isCashflowLoading = false,
+                        cashflowError = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyTransactionsResult(
+        result: ReportResult<MonthlyTransactionsData>,
+        expectedPeriod: String
+    ) {
+        if (_state.value.periodKey != expectedPeriod) return
         when (result) {
             is ReportResult.Success -> {
                 _state.update {

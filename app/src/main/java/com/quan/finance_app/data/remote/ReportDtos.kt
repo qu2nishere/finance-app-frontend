@@ -8,6 +8,8 @@ package com.quan.finance_app.data.remote
  * - backend/report-service/src/main/java/com/quan/reportservice/stats/dto/MonthlyTransactionsResponse.java
  * - backend/report-service/src/main/java/com/quan/reportservice/stats/dto/DailyTransactionGroupResponse.java
  * - backend/report-service/src/main/java/com/quan/reportservice/stats/dto/ReportTransactionItemResponse.java
+ * - backend/report-service/src/main/java/com/quan/reportservice/stats/dto/CashflowSummaryResponse.java
+ * - backend/report-service/src/main/java/com/quan/reportservice/stats/dto/WalletCashflowItemResponse.java
  */
 
 data class MonthlyBarPointDto(
@@ -78,4 +80,28 @@ data class MonthlyTransactionsDto(
     val filteredTotalAmount: Long,
     val filteredTxnCount: Int,
     val days: List<DailyTransactionGroupDto>? = emptyList()
+)
+
+data class WalletCashflowItemDto(
+    val walletId: String,
+    val walletName: String,
+    val walletKind: String,
+    val color: String? = null,
+    val accountMask: String? = null,
+    val openingBalance: Long,
+    val totalIncome: Long,
+    val totalExpense: Long,
+    val netFlow: Long,
+    val closingBalance: Long,
+    val includeInTotal: Boolean = true
+)
+
+data class CashflowSummaryDto(
+    val period: String,
+    val currencyCode: String? = "VND",
+    val openingBalance: Long,
+    val totalIncome: Long,
+    val totalExpense: Long,
+    val closingBalance: Long,
+    val wallets: List<WalletCashflowItemDto>? = emptyList()
 )

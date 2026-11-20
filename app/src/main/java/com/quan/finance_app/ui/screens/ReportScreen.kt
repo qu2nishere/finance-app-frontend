@@ -44,15 +44,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.data.CashflowSummaryData
 import com.quan.finance_app.data.CategoryBreakdownItem
 import com.quan.finance_app.data.MonthlyBarPoint
 import com.quan.finance_app.data.MonthlyTransactionsData
 import com.quan.finance_app.data.MonthlyTrendData
 import com.quan.finance_app.data.ReportTransactionItem
+import com.quan.finance_app.data.WalletCashflowItem
 import com.quan.finance_app.ui.components.core.MfTabHeader
+import com.quan.finance_app.ui.report.DualBarData
 import com.quan.finance_app.ui.report.IncomeFilterOption
 import com.quan.finance_app.ui.report.ReportUiState
 import com.quan.finance_app.ui.report.ReportViewModel
+import com.quan.finance_app.ui.report.averagePerDay
+import com.quan.finance_app.ui.report.buildFiveMonthBarTriples
+import com.quan.finance_app.ui.report.buildFiveMonthDualBars
+import com.quan.finance_app.ui.report.buildWalletBars
+import com.quan.finance_app.ui.report.forecastMonthEnd
+import com.quan.finance_app.ui.report.netMomPercent
 import com.quan.finance_app.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -64,13 +73,6 @@ import java.util.Locale
 private val REPORT_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
 private val REPORT_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val REPORT_ZONE: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
-
-data class DualBarData(
-    val label: String,
-    val inFraction: Float,
-    val outFraction: Float,
-    val isCurrent: Boolean
-)
 
 @Composable
 fun ReportRoute(
@@ -123,9 +125,9 @@ fun ReportScreen(
             MonthSelectorHeader(
                 month = currentMonth,
                 year = currentYear,
+                canGoNext = state.canGoNext,
                 onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth,
-                showMonthPicker = selectedTab != 0
+                onNextMonth = onNextMonth
             )
         }
 
@@ -143,7 +145,14 @@ fun ReportScreen(
             // TAB 1: CHI TIÊU
             0 -> {
                 item {
-                    ExpenseOverviewCard()
+                    ExpenseOverviewCard(
+                        trend = state.expenseTrend,
+                        year = currentYear,
+                        month = currentMonth,
+                        isLoading = state.isExpenseTrendLoading,
+                        errorMessage = state.expenseTrendError,
+                        onRetry = onRefresh
+                    )
                 }
 
                 // Danh sách toàn bộ giao dịch đã thực hiện trong tháng kèm bộ lọc ngày
@@ -166,8 +175,6 @@ fun ReportScreen(
                         transactionsData = state.expenseTransactions,
                         isLoading = state.isTransactionsLoading,
                         errorMessage = state.transactionsError,
-                        onPreviousMonth = onPreviousMonth,
-                        onNextMonth = onNextMonth,
                         onPickDate = onPickDate,
                         onClearDate = onClearDate,
                         onRetry = onRefresh
@@ -243,11 +250,24 @@ fun ReportScreen(
             // TAB 3: DÒNG TIỀN
             2 -> {
                 item {
-                    CashflowOverviewCard()
+                    CashflowOverviewCard(
+                        incomeTrend = state.cashflowIncomeTrend,
+                        expenseTrend = state.expenseTrend,
+                        year = currentYear,
+                        month = currentMonth,
+                        isLoading = state.isCashflowIncomeLoading || state.isExpenseTrendLoading,
+                        errorMessage = state.cashflowIncomeError ?: state.expenseTrendError,
+                        onRetry = onRefresh
+                    )
                 }
 
                 item {
-                    CashflowPeriodSummaryCard()
+                    CashflowPeriodSummaryCard(
+                        summary = state.cashflowSummary,
+                        isLoading = state.isCashflowLoading,
+                        errorMessage = state.cashflowError,
+                        onRetry = onRefresh
+                    )
                 }
 
                 item {
@@ -262,7 +282,10 @@ fun ReportScreen(
                 }
 
                 item {
-                    WalletBreakdownCard()
+                    WalletBreakdownCard(
+                        wallets = state.cashflowSummary?.wallets ?: emptyList(),
+                        isLoading = state.isCashflowLoading && state.cashflowSummary == null
+                    )
                 }
 
                 item {
@@ -312,14 +335,18 @@ fun ReportScreen(
 fun MonthSelectorHeader(
     month: Int,
     year: Int,
+    canGoNext: Boolean = true,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
-    showMonthPicker: Boolean = true
+    onNextMonth: () -> Unit
 ) {
     MfTabHeader(title = "Thống kê") {
-        if (showMonthPicker) {
-            MonthStepper(month, year, onPreviousMonth, onNextMonth)
-        }
+        MonthStepper(
+            month = month,
+            year = year,
+            canGoNext = canGoNext,
+            onPreviousMonth = onPreviousMonth,
+            onNextMonth = onNextMonth
+        )
     }
 }
 
@@ -330,6 +357,7 @@ fun MonthStepper(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     modifier: Modifier = Modifier,
+    canGoNext: Boolean = true,
     fillWidth: Boolean = false
 ) {
     Row(
@@ -352,11 +380,19 @@ fun MonthStepper(
             fontSize = 14.sp,
             color = MoneyFlowTheme.colors.textPrimary
         )
-        IconButton(onClick = onNextMonth, modifier = Modifier.size(32.dp)) {
+        IconButton(
+            onClick = onNextMonth,
+            enabled = canGoNext,
+            modifier = Modifier.size(32.dp)
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = "Tháng sau",
-                tint = MoneyFlowTheme.colors.textSecondary,
+                tint = if (canGoNext) {
+                    MoneyFlowTheme.colors.textSecondary
+                } else {
+                    MoneyFlowTheme.colors.textSecondary.copy(alpha = 0.3f)
+                },
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -424,7 +460,28 @@ fun ReportTabs(
 // -------------------------------------------------------------------------
 
 @Composable
-fun ExpenseOverviewCard() {
+fun ExpenseOverviewCard(
+    trend: MonthlyTrendData?,
+    year: Int,
+    month: Int,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit
+) {
+    val selectedAmount = trend?.selectedAmount ?: 0L
+    val momChangePercent = trend?.momChangePercent
+    val today = remember { LocalDate.now(REPORT_ZONE) }
+    val selectedYm = remember(year, month) { YearMonth.of(year, month) }
+    val avgPerDay = remember(selectedAmount, selectedYm, today) {
+        averagePerDay(selectedAmount, selectedYm, today)
+    }
+    val forecast = remember(selectedAmount, selectedYm, today) {
+        forecastMonthEnd(selectedAmount, selectedYm, today)
+    }
+    val barData = remember(trend, year, month) {
+        buildFiveMonthBarTriples(trend?.points, year, month)
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -435,22 +492,38 @@ fun ExpenseOverviewCard() {
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
-                    Text(
-                        text = "Tổng chi tháng này",
-                        fontFamily = FontCore,
-                        fontSize = 14.sp,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Tổng chi tháng $month",
+                            fontFamily = FontCore,
+                            fontSize = 14.sp,
+                            color = MoneyFlowTheme.colors.textSecondary
+                        )
+                        if (isLoading && trend == null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang tải…",
+                                fontFamily = FontCore,
+                                fontSize = 12.sp,
+                                color = MoneyFlowTheme.colors.textSecondary
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "9.712.000",
+                            text = formatPlainVndNumber(selectedAmount),
                             fontFamily = FontMono,
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp,
@@ -468,40 +541,18 @@ fun ExpenseOverviewCard() {
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .background(Grow50, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "▼",
-                        fontSize = 9.sp,
-                        color = Grow500,
-                        fontFamily = FontCore
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "4,1%",
-                        fontFamily = FontMono,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = Grow500
-                    )
-                }
+                MomComparisonBadge(
+                    momChangePercent = momChangePercent,
+                    selectedAmount = selectedAmount,
+                    higherIsBetter = false
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // 5-Month Expense Bar Chart with perfectly horizontal aligned baseline
             FiveMonthBarChart(
-                data = listOf(
-                    Triple("T4", 0.48f, false),
-                    Triple("T5", 0.36f, false),
-                    Triple("T6", 0.68f, false),
-                    Triple("T7", 0.82f, false),
-                    Triple("T8", 0.74f, true)
-                ),
+                data = barData,
                 activeColor = Heat500,
                 inactiveColor = Heat100
             )
@@ -516,13 +567,15 @@ fun ExpenseOverviewCard() {
                         append("Trung bình 1 ngày: ")
                     }
                     withStyle(SpanStyle(color = Ink900, fontFamily = FontMono, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
-                        append("313.000₫")
+                        append(formatVnd(avgPerDay))
                     }
-                    withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
-                        append(" · Dự báo cuối tháng: ")
-                    }
-                    withStyle(SpanStyle(color = Ink900, fontFamily = FontCore, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
-                        append("10,4tr")
+                    if (forecast != null) {
+                        withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
+                            append(" · Dự báo cuối tháng: ")
+                        }
+                        withStyle(SpanStyle(color = Ink900, fontFamily = FontMono, fontWeight = FontWeight.Bold, fontSize = 13.sp)) {
+                            append(formatVnd(forecast))
+                        }
                     }
                 }
             )
@@ -542,8 +595,6 @@ fun MonthTransactionsLedgerCard(
     transactionsData: MonthlyTransactionsData?,
     isLoading: Boolean,
     errorMessage: String?,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
     onPickDate: (LocalDate) -> Unit,
     onClearDate: () -> Unit,
     onRetry: () -> Unit
@@ -619,20 +670,7 @@ fun MonthTransactionsLedgerCard(
                 }
             }
 
-            // Lớp lọc 1: theo tháng - tràn hết một hàng
-            MonthStepper(
-                month = month,
-                year = year,
-                onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Ink50, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                fillWidth = true
-            )
-
-            // Lớp lọc 2: theo ngày (date picker) trong tháng đã chọn, kèm nút xem cả tháng
+            // Bộ lọc theo ngày (date picker) trong tháng đã chọn, kèm nút xem cả tháng
             var showDatePicker by remember { mutableStateOf(false) }
             val pickedLabel = if (selectedDate == null) {
                 "Chọn ngày"
@@ -1086,9 +1124,9 @@ fun IncomeOverviewCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (selectedCategoryId == null) {
-                            "Tổng thu tháng này"
+                            "Tổng thu tháng $month"
                         } else {
-                            "Thu nhập: $selectedCategoryLabel"
+                            "Thu nhập tháng $month: $selectedCategoryLabel"
                         },
                         fontFamily = FontCore,
                         fontSize = 14.sp,
@@ -1162,18 +1200,41 @@ fun IncomeOverviewCard(
 @Composable
 private fun MomComparisonBadge(
     momChangePercent: Double?,
-    selectedAmount: Long
+    selectedAmount: Long,
+    higherIsBetter: Boolean = true,
+    showNewWhenNull: Boolean = true
 ) {
-    val (bgColor, fgColor, arrow, label) = when {
-        momChangePercent == null && selectedAmount > 0L ->
-            MomBadgeStyle(Grow50, Grow500, null, "Mới")
-        momChangePercent == null || momChangePercent == 0.0 ->
+    val style = when {
+        momChangePercent == null && selectedAmount != 0L && showNewWhenNull -> {
+            if (higherIsBetter) {
+                MomBadgeStyle(Grow50, Grow500, null, "Mới")
+            } else {
+                MomBadgeStyle(Heat50, Heat500, null, "Mới")
+            }
+        }
+        momChangePercent == null -> return
+        momChangePercent == 0.0 ->
             MomBadgeStyle(Ink100, MoneyFlowTheme.colors.textSecondary, null, "0%")
-        momChangePercent > 0.0 ->
-            MomBadgeStyle(Grow50, Grow500, "▲", "${formatPercentVi(momChangePercent)}%")
-        else ->
-            MomBadgeStyle(Heat50, Heat500, "▼", "${formatPercentVi(kotlin.math.abs(momChangePercent))}%")
+        momChangePercent > 0.0 -> {
+            val isGood = higherIsBetter
+            MomBadgeStyle(
+                bg = if (isGood) Grow50 else Heat50,
+                fg = if (isGood) Grow500 else Heat500,
+                arrow = "▲",
+                label = "${formatPercentVi(momChangePercent)}%"
+            )
+        }
+        else -> {
+            val isGood = !higherIsBetter
+            MomBadgeStyle(
+                bg = if (isGood) Grow50 else Heat50,
+                fg = if (isGood) Grow500 else Heat500,
+                arrow = "▼",
+                label = "${formatPercentVi(kotlin.math.abs(momChangePercent))}%"
+            )
+        }
     }
+    val (bgColor, fgColor, arrow, label) = style
 
     Row(
         modifier = Modifier
@@ -1240,7 +1301,7 @@ fun IncomeSourceCard(
                         if (mom != null) {
                             append(" · ${formatPercentVi(kotlin.math.abs(mom))}% so với tháng trước")
                         } else if (item.totalAmount > 0L) {
-                            append(" · Mới trong tháng này")
+                            append(" · Mới trong tháng $month")
                         }
                     }
                     val trendUp = when {
@@ -1293,30 +1354,6 @@ private fun ReportInlineError(
                 .clickable(onClick = onRetry)
                 .padding(4.dp)
         )
-    }
-}
-
-private fun buildFiveMonthBarTriples(
-    points: List<MonthlyBarPoint>?,
-    year: Int,
-    month: Int
-): List<Triple<String, Float, Boolean>> {
-    if (points.isNullOrEmpty()) {
-        val baseYm = YearMonth.of(year, month)
-        return (4 downTo 0).map { offset ->
-            val ym = baseYm.minusMonths(offset.toLong())
-            Triple("T${ym.monthValue}", 0f, offset == 0)
-        }
-    }
-    val maxAmount = points.maxOfOrNull { it.totalAmount } ?: 0L
-    return points.map { p ->
-        // Chi doi sang Float o buoc ve cuoi cung; tranh chia 0 khi ca 5 thang deu bang 0
-        val fraction = if (maxAmount > 0L) {
-            (p.totalAmount.toFloat() / maxAmount.toFloat()).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-        Triple("T${p.month}", fraction, p.isSelected)
     }
 }
 
@@ -1450,7 +1487,40 @@ fun SavingsRateCard() {
 // -------------------------------------------------------------------------
 
 @Composable
-fun CashflowOverviewCard() {
+fun CashflowOverviewCard(
+    incomeTrend: MonthlyTrendData?,
+    expenseTrend: MonthlyTrendData?,
+    year: Int,
+    month: Int,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit
+) {
+    val incomeAmount = incomeTrend?.selectedAmount ?: 0L
+    val expenseAmount = expenseTrend?.selectedAmount ?: 0L
+    val netAmount = incomeAmount - expenseAmount
+    val netPrefix = when {
+        netAmount > 0L -> "+"
+        netAmount < 0L -> "−"
+        else -> ""
+    }
+    val netColor = when {
+        netAmount > 0L -> Grow500
+        netAmount < 0L -> Heat500
+        else -> MoneyFlowTheme.colors.textPrimary
+    }
+    val momPercent = remember(incomeTrend, expenseTrend) {
+        netMomPercent(incomeTrend, expenseTrend)
+    }
+    val dualBars = remember(incomeTrend, expenseTrend, year, month) {
+        buildFiveMonthDualBars(
+            incomePoints = incomeTrend?.points,
+            expensePoints = expenseTrend?.points,
+            year = year,
+            month = month
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1461,26 +1531,42 @@ fun CashflowOverviewCard() {
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
-                    Text(
-                        text = "Dòng tiền ròng tháng 8",
-                        fontFamily = FontCore,
-                        fontSize = 14.sp,
-                        color = MoneyFlowTheme.colors.textSecondary
-                    )
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Dòng tiền ròng tháng $month",
+                            fontFamily = FontCore,
+                            fontSize = 14.sp,
+                            color = MoneyFlowTheme.colors.textSecondary
+                        )
+                        if (isLoading && incomeTrend == null && expenseTrend == null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang tải…",
+                                fontFamily = FontCore,
+                                fontSize = 12.sp,
+                                color = MoneyFlowTheme.colors.textSecondary
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "+8.488.000",
+                            text = "$netPrefix${formatPlainVndNumber(netAmount)}",
                             fontFamily = FontMono,
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp,
-                            color = Grow500,
+                            color = netColor,
                             letterSpacing = (-0.5).sp
                         )
                         Text(
@@ -1488,42 +1574,24 @@ fun CashflowOverviewCard() {
                             fontFamily = FontCore,
                             fontWeight = FontWeight.Bold,
                             fontSize = 24.sp,
-                            color = Grow500,
+                            color = netColor,
                             modifier = Modifier.padding(bottom = 3.dp, start = 1.dp)
                         )
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .background(Grow50, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("▲", fontSize = 9.sp, color = Grow500, fontFamily = FontCore)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "14%",
-                        fontFamily = FontMono,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = Grow500
-                    )
-                }
+                MomComparisonBadge(
+                    momChangePercent = momPercent,
+                    selectedAmount = netAmount,
+                    higherIsBetter = true,
+                    showNewWhenNull = false
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Dual Bar Chart (Vào vs Ra) with perfectly aligned bottom baseline
-            DualMonthlyBarChart(
-                data = listOf(
-                    DualBarData("T4", 0.50f, 0.65f, false),
-                    DualBarData("T5", 0.60f, 0.45f, false),
-                    DualBarData("T6", 0.55f, 0.75f, false),
-                    DualBarData("T7", 0.70f, 0.85f, false),
-                    DualBarData("T8", 0.88f, 0.82f, true)
-                )
-            )
+            DualMonthlyBarChart(data = dualBars)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1568,7 +1636,22 @@ fun CashflowOverviewCard() {
 }
 
 @Composable
-fun CashflowPeriodSummaryCard() {
+fun CashflowPeriodSummaryCard(
+    summary: CashflowSummaryData?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit
+) {
+    val opening = summary?.openingBalance ?: 0L
+    val totalIncome = summary?.totalIncome ?: 0L
+    val totalExpense = summary?.totalExpense ?: 0L
+    val closing = summary?.closingBalance ?: 0L
+
+    val openingText = formatBalanceVnd(opening)
+    val incomeText = if (totalIncome > 0L) "+${formatPlainVndNumber(totalIncome)}₫" else "0₫"
+    val expenseText = if (totalExpense > 0L) "−${formatPlainVndNumber(totalExpense)}₫" else "0₫"
+    val closingText = formatBalanceVnd(closing)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1580,12 +1663,23 @@ fun CashflowPeriodSummaryCard() {
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+            } else if (isLoading && summary == null) {
+                Text(
+                    text = "Đang tải tóm tắt kỳ…",
+                    fontFamily = FontCore,
+                    fontSize = 12.sp,
+                    color = MoneyFlowTheme.colors.textSecondary
+                )
+            }
+
             CashflowSummaryRow(
                 icon = Icons.Outlined.AccountBalanceWallet,
                 iconBg = Ink100,
                 iconTint = Ink600,
                 title = "Số dư đầu kỳ",
-                amount = "11.510.000₫",
+                amount = openingText,
                 amountColor = MoneyFlowTheme.colors.textPrimary
             )
 
@@ -1596,7 +1690,7 @@ fun CashflowPeriodSummaryCard() {
                 iconBg = Grow50,
                 iconTint = Grow500,
                 title = "Tiền vào",
-                amount = "+18.200.000₫",
+                amount = incomeText,
                 amountColor = Grow500
             )
 
@@ -1607,7 +1701,7 @@ fun CashflowPeriodSummaryCard() {
                 iconBg = Blue50,
                 iconTint = Blue500,
                 title = "Tiền ra",
-                amount = "-9.712.000₫",
+                amount = expenseText,
                 amountColor = Heat500
             )
 
@@ -1618,11 +1712,16 @@ fun CashflowPeriodSummaryCard() {
                 iconBg = Grow50,
                 iconTint = Grow500,
                 title = "Số dư cuối kỳ",
-                amount = "19.998.000₫",
+                amount = closingText,
                 amountColor = MoneyFlowTheme.colors.textPrimary
             )
         }
     }
+}
+
+private fun formatBalanceVnd(amount: Long): String {
+    val prefix = if (amount < 0L) "−" else ""
+    return "$prefix${formatPlainVndNumber(amount)}₫"
 }
 
 @Composable
@@ -1674,7 +1773,12 @@ fun CashflowSummaryRow(
 }
 
 @Composable
-fun WalletBreakdownCard() {
+fun WalletBreakdownCard(
+    wallets: List<WalletCashflowItem>,
+    isLoading: Boolean
+) {
+    val bars = remember(wallets) { buildWalletBars(wallets) }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1686,32 +1790,50 @@ fun WalletBreakdownCard() {
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 1. Vietcombank
-            WalletProgressItem(
-                title = "Vietcombank ••42",
-                amount = "+7.900.000₫",
-                isPositive = true,
-                progress = 0.75f,
-                progressColor = Grow500
-            )
-
-            // 2. Ví Momo
-            WalletProgressItem(
-                title = "Ví Momo",
-                amount = "-1.240.000₫",
-                isPositive = false,
-                progress = 0.25f,
-                progressColor = Heat500
-            )
-
-            // 3. Tiền mặt
-            WalletProgressItem(
-                title = "Tiền mặt",
-                amount = "-320.000₫",
-                isPositive = false,
-                progress = 0.10f,
-                progressColor = Heat200
-            )
+            when {
+                isLoading -> {
+                    Text(
+                        text = "Đang tải dữ liệu ví…",
+                        fontFamily = FontCore,
+                        fontSize = 14.sp,
+                        color = MoneyFlowTheme.colors.textSecondary
+                    )
+                }
+                bars.isEmpty() -> {
+                    Text(
+                        text = "Chưa có ví nào",
+                        fontFamily = FontCore,
+                        fontSize = 14.sp,
+                        color = MoneyFlowTheme.colors.textSecondary
+                    )
+                }
+                else -> {
+                    bars.forEach { bar ->
+                        val amountText = when {
+                            bar.netFlow > 0L -> "+${formatPlainVndNumber(bar.netFlow)}₫"
+                            bar.netFlow < 0L -> "−${formatPlainVndNumber(bar.netFlow)}₫"
+                            else -> "0₫"
+                        }
+                        val amountColor = when {
+                            bar.isZero -> MoneyFlowTheme.colors.textSecondary
+                            bar.isPositive -> Grow500
+                            else -> Heat500
+                        }
+                        val progressColor = when {
+                            bar.isZero -> Ink200
+                            bar.isPositive -> Grow500
+                            else -> Heat500
+                        }
+                        WalletProgressItem(
+                            title = bar.title,
+                            amount = amountText,
+                            amountColor = amountColor,
+                            progress = bar.progress,
+                            progressColor = progressColor
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1720,7 +1842,7 @@ fun WalletBreakdownCard() {
 fun WalletProgressItem(
     title: String,
     amount: String,
-    isPositive: Boolean,
+    amountColor: Color,
     progress: Float,
     progressColor: Color
 ) {
@@ -1743,7 +1865,7 @@ fun WalletProgressItem(
                     fontFamily = FontMono,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = if (isPositive) Grow500 else Heat500
+                    color = amountColor
                 )
                 Text(
                     text = " · ",
@@ -1768,12 +1890,14 @@ fun WalletProgressItem(
                 .height(8.dp)
                 .background(Ink100, RoundedCornerShape(4.dp))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
-                    .fillMaxHeight()
-                    .background(progressColor, RoundedCornerShape(4.dp))
-            )
+            if (progress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(progressColor, RoundedCornerShape(4.dp))
+                )
+            }
         }
     }
 }
