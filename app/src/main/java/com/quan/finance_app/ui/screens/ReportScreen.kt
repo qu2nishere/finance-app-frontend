@@ -44,11 +44,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.data.CashflowSummaryData
 import com.quan.finance_app.data.CategoryBreakdownItem
 import com.quan.finance_app.data.MonthlyBarPoint
 import com.quan.finance_app.data.MonthlyTransactionsData
 import com.quan.finance_app.data.MonthlyTrendData
 import com.quan.finance_app.data.ReportTransactionItem
+import com.quan.finance_app.data.WalletCashflowItem
 import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.report.DualBarData
 import com.quan.finance_app.ui.report.IncomeFilterOption
@@ -57,6 +59,7 @@ import com.quan.finance_app.ui.report.ReportViewModel
 import com.quan.finance_app.ui.report.averagePerDay
 import com.quan.finance_app.ui.report.buildFiveMonthBarTriples
 import com.quan.finance_app.ui.report.buildFiveMonthDualBars
+import com.quan.finance_app.ui.report.buildWalletBars
 import com.quan.finance_app.ui.report.forecastMonthEnd
 import com.quan.finance_app.ui.report.netMomPercent
 import com.quan.finance_app.ui.theme.*
@@ -259,7 +262,12 @@ fun ReportScreen(
                 }
 
                 item {
-                    CashflowPeriodSummaryCard()
+                    CashflowPeriodSummaryCard(
+                        summary = state.cashflowSummary,
+                        isLoading = state.isCashflowLoading,
+                        errorMessage = state.cashflowError,
+                        onRetry = onRefresh
+                    )
                 }
 
                 item {
@@ -274,7 +282,10 @@ fun ReportScreen(
                 }
 
                 item {
-                    WalletBreakdownCard()
+                    WalletBreakdownCard(
+                        wallets = state.cashflowSummary?.wallets ?: emptyList(),
+                        isLoading = state.isCashflowLoading && state.cashflowSummary == null
+                    )
                 }
 
                 item {
@@ -1625,7 +1636,22 @@ fun CashflowOverviewCard(
 }
 
 @Composable
-fun CashflowPeriodSummaryCard() {
+fun CashflowPeriodSummaryCard(
+    summary: CashflowSummaryData?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit
+) {
+    val opening = summary?.openingBalance ?: 0L
+    val totalIncome = summary?.totalIncome ?: 0L
+    val totalExpense = summary?.totalExpense ?: 0L
+    val closing = summary?.closingBalance ?: 0L
+
+    val openingText = formatBalanceVnd(opening)
+    val incomeText = if (totalIncome > 0L) "+${formatPlainVndNumber(totalIncome)}₫" else "0₫"
+    val expenseText = if (totalExpense > 0L) "−${formatPlainVndNumber(totalExpense)}₫" else "0₫"
+    val closingText = formatBalanceVnd(closing)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1637,12 +1663,23 @@ fun CashflowPeriodSummaryCard() {
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (errorMessage != null) {
+                ReportInlineError(message = errorMessage, onRetry = onRetry)
+            } else if (isLoading && summary == null) {
+                Text(
+                    text = "Đang tải tóm tắt kỳ…",
+                    fontFamily = FontCore,
+                    fontSize = 12.sp,
+                    color = MoneyFlowTheme.colors.textSecondary
+                )
+            }
+
             CashflowSummaryRow(
                 icon = Icons.Outlined.AccountBalanceWallet,
                 iconBg = Ink100,
                 iconTint = Ink600,
                 title = "Số dư đầu kỳ",
-                amount = "11.510.000₫",
+                amount = openingText,
                 amountColor = MoneyFlowTheme.colors.textPrimary
             )
 
@@ -1653,7 +1690,7 @@ fun CashflowPeriodSummaryCard() {
                 iconBg = Grow50,
                 iconTint = Grow500,
                 title = "Tiền vào",
-                amount = "+18.200.000₫",
+                amount = incomeText,
                 amountColor = Grow500
             )
 
@@ -1664,7 +1701,7 @@ fun CashflowPeriodSummaryCard() {
                 iconBg = Blue50,
                 iconTint = Blue500,
                 title = "Tiền ra",
-                amount = "-9.712.000₫",
+                amount = expenseText,
                 amountColor = Heat500
             )
 
@@ -1675,11 +1712,16 @@ fun CashflowPeriodSummaryCard() {
                 iconBg = Grow50,
                 iconTint = Grow500,
                 title = "Số dư cuối kỳ",
-                amount = "19.998.000₫",
+                amount = closingText,
                 amountColor = MoneyFlowTheme.colors.textPrimary
             )
         }
     }
+}
+
+private fun formatBalanceVnd(amount: Long): String {
+    val prefix = if (amount < 0L) "−" else ""
+    return "$prefix${formatPlainVndNumber(amount)}₫"
 }
 
 @Composable
@@ -1731,7 +1773,12 @@ fun CashflowSummaryRow(
 }
 
 @Composable
-fun WalletBreakdownCard() {
+fun WalletBreakdownCard(
+    wallets: List<WalletCashflowItem>,
+    isLoading: Boolean
+) {
+    val bars = remember(wallets) { buildWalletBars(wallets) }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -1743,32 +1790,50 @@ fun WalletBreakdownCard() {
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 1. Vietcombank
-            WalletProgressItem(
-                title = "Vietcombank ••42",
-                amount = "+7.900.000₫",
-                isPositive = true,
-                progress = 0.75f,
-                progressColor = Grow500
-            )
-
-            // 2. Ví Momo
-            WalletProgressItem(
-                title = "Ví Momo",
-                amount = "-1.240.000₫",
-                isPositive = false,
-                progress = 0.25f,
-                progressColor = Heat500
-            )
-
-            // 3. Tiền mặt
-            WalletProgressItem(
-                title = "Tiền mặt",
-                amount = "-320.000₫",
-                isPositive = false,
-                progress = 0.10f,
-                progressColor = Heat200
-            )
+            when {
+                isLoading -> {
+                    Text(
+                        text = "Đang tải dữ liệu ví…",
+                        fontFamily = FontCore,
+                        fontSize = 14.sp,
+                        color = MoneyFlowTheme.colors.textSecondary
+                    )
+                }
+                bars.isEmpty() -> {
+                    Text(
+                        text = "Chưa có ví nào",
+                        fontFamily = FontCore,
+                        fontSize = 14.sp,
+                        color = MoneyFlowTheme.colors.textSecondary
+                    )
+                }
+                else -> {
+                    bars.forEach { bar ->
+                        val amountText = when {
+                            bar.netFlow > 0L -> "+${formatPlainVndNumber(bar.netFlow)}₫"
+                            bar.netFlow < 0L -> "−${formatPlainVndNumber(bar.netFlow)}₫"
+                            else -> "0₫"
+                        }
+                        val amountColor = when {
+                            bar.isZero -> MoneyFlowTheme.colors.textSecondary
+                            bar.isPositive -> Grow500
+                            else -> Heat500
+                        }
+                        val progressColor = when {
+                            bar.isZero -> Ink200
+                            bar.isPositive -> Grow500
+                            else -> Heat500
+                        }
+                        WalletProgressItem(
+                            title = bar.title,
+                            amount = amountText,
+                            amountColor = amountColor,
+                            progress = bar.progress,
+                            progressColor = progressColor
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1777,7 +1842,7 @@ fun WalletBreakdownCard() {
 fun WalletProgressItem(
     title: String,
     amount: String,
-    isPositive: Boolean,
+    amountColor: Color,
     progress: Float,
     progressColor: Color
 ) {
@@ -1800,7 +1865,7 @@ fun WalletProgressItem(
                     fontFamily = FontMono,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = if (isPositive) Grow500 else Heat500
+                    color = amountColor
                 )
                 Text(
                     text = " · ",
@@ -1825,12 +1890,14 @@ fun WalletProgressItem(
                 .height(8.dp)
                 .background(Ink100, RoundedCornerShape(4.dp))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
-                    .fillMaxHeight()
-                    .background(progressColor, RoundedCornerShape(4.dp))
-            )
+            if (progress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = progress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .background(progressColor, RoundedCornerShape(4.dp))
+                )
+            }
         }
     }
 }

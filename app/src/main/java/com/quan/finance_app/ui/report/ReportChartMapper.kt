@@ -2,6 +2,7 @@ package com.quan.finance_app.ui.report
 
 import com.quan.finance_app.data.MonthlyBarPoint
 import com.quan.finance_app.data.MonthlyTrendData
+import com.quan.finance_app.data.WalletCashflowItem
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.Locale
@@ -12,6 +13,15 @@ data class DualBarData(
     val inFraction: Float,
     val outFraction: Float,
     val isCurrent: Boolean
+)
+
+data class WalletBarData(
+    val walletId: String,
+    val title: String,
+    val netFlow: Long,
+    val progress: Float,
+    val isPositive: Boolean,
+    val isZero: Boolean
 )
 
 /**
@@ -133,4 +143,36 @@ fun netMomPercent(
     val previousNet = (incomeTrend?.previousAmount ?: 0L) - (expenseTrend?.previousAmount ?: 0L)
     if (previousNet == 0L) return null
     return ((currentNet - previousNet).toDouble() / abs(previousNet).toDouble()) * 100.0
+}
+
+/**
+ * Chuẩn hoá danh sách ví cho thẻ "Theo ví" (D6):
+ * - Sắp xếp theo |netFlow| giảm dần (đồng hạng theo tên ví).
+ * - Độ dài thanh = |netFlow| / max|netFlow|; khi mọi ví ròng = 0 thì thanh rỗng (0f).
+ * - Kèm hậu tố "••<mask>" nếu có accountMask.
+ */
+fun buildWalletBars(wallets: List<WalletCashflowItem>): List<WalletBarData> {
+    if (wallets.isEmpty()) return emptyList()
+    val sorted = wallets.sortedWith(
+        compareByDescending<WalletCashflowItem> { abs(it.netFlow) }
+            .thenBy { it.walletName }
+    )
+    val maxAbs = sorted.maxOfOrNull { abs(it.netFlow) } ?: 0L
+    return sorted.map { w ->
+        val mask = w.accountMask?.trim().takeIf { !it.isNullOrEmpty() }
+        val title = if (mask != null) "${w.walletName} ••$mask" else w.walletName
+        val progress = if (maxAbs > 0L) {
+            (abs(w.netFlow).toFloat() / maxAbs.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        WalletBarData(
+            walletId = w.walletId,
+            title = title,
+            netFlow = w.netFlow,
+            progress = progress,
+            isPositive = w.netFlow >= 0L,
+            isZero = w.netFlow == 0L
+        )
+    }
 }

@@ -2,6 +2,7 @@ package com.quan.finance_app.ui.report
 
 import com.quan.finance_app.data.MonthlyBarPoint
 import com.quan.finance_app.data.MonthlyTrendData
+import com.quan.finance_app.data.WalletCashflowItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -134,6 +135,62 @@ class ReportChartMapperTest {
         assertNotNull(pctRecover)
         assertEquals(200.0, pctRecover!!, 0.001)
     }
+
+    @Test
+    fun buildWalletBars_sortsByAbsNetFlowDescendingAndNormalizesProgress() {
+        val wallets = listOf(
+            walletItem(id = "w-cash", name = "Tiền mặt", netFlow = 0L),
+            walletItem(id = "w-momo", name = "Ví Momo", netFlow = -2_000_000L),
+            walletItem(id = "w-vcb", name = "Vietcombank", mask = "42", netFlow = 8_000_000L)
+        )
+
+        val bars = buildWalletBars(wallets)
+        assertEquals(3, bars.size)
+
+        assertEquals("Vietcombank ••42", bars[0].title)
+        assertEquals(1.0f, bars[0].progress, 0.001f)
+        assertEquals(true, bars[0].isPositive)
+        assertEquals(false, bars[0].isZero)
+
+        assertEquals("Ví Momo", bars[1].title)
+        assertEquals(0.25f, bars[1].progress, 0.001f)
+        assertEquals(false, bars[1].isPositive)
+        assertEquals(false, bars[1].isZero)
+
+        assertEquals("Tiền mặt", bars[2].title)
+        assertEquals(0.0f, bars[2].progress, 0.001f)
+        assertEquals(true, bars[2].isZero)
+    }
+
+    @Test
+    fun buildWalletBars_emptyOrAllZeroReturnsSafeFractions() {
+        assertEquals(0, buildWalletBars(emptyList()).size)
+        val zeroBars = buildWalletBars(
+            listOf(walletItem(id = "w-1", name = "Tiền mặt", netFlow = 0L))
+        )
+        assertEquals(1, zeroBars.size)
+        assertEquals(0f, zeroBars[0].progress, 0.001f)
+        assertEquals(true, zeroBars[0].isZero)
+    }
+
+    private fun walletItem(
+        id: String,
+        name: String,
+        mask: String? = null,
+        netFlow: Long
+    ) = WalletCashflowItem(
+        walletId = id,
+        walletName = name,
+        walletKind = "BANK",
+        color = "#0E9F6E",
+        accountMask = mask,
+        openingBalance = 0L,
+        totalIncome = if (netFlow > 0L) netFlow else 0L,
+        totalExpense = if (netFlow < 0L) -netFlow else 0L,
+        netFlow = netFlow,
+        closingBalance = netFlow,
+        includeInTotal = true
+    )
 
     private fun trendOf(selected: Long, previous: Long, type: String) = MonthlyTrendData(
         period = "2026-08",
