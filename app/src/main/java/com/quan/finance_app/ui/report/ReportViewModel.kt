@@ -2,6 +2,7 @@ package com.quan.finance_app.ui.report
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.quan.finance_app.data.CashflowSummaryData
 import com.quan.finance_app.data.CategoryBreakdownItem
 import com.quan.finance_app.data.MonthlyTransactionsData
 import com.quan.finance_app.data.MonthlyTrendData
@@ -36,16 +37,19 @@ data class ReportUiState(
     val incomeTrend: MonthlyTrendData? = null,
     val expenseTrend: MonthlyTrendData? = null,
     val cashflowIncomeTrend: MonthlyTrendData? = null,
+    val cashflowSummary: CashflowSummaryData? = null,
     val incomeFilterOptions: List<IncomeFilterOption> = DEFAULT_INCOME_OPTIONS,
     val categoryBreakdown: List<CategoryBreakdownItem> = emptyList(),
     val expenseTransactions: MonthlyTransactionsData? = null,
     val isTrendLoading: Boolean = false,
     val isExpenseTrendLoading: Boolean = false,
     val isCashflowIncomeLoading: Boolean = false,
+    val isCashflowLoading: Boolean = false,
     val isTransactionsLoading: Boolean = false,
     val trendError: String? = null,
     val expenseTrendError: String? = null,
     val cashflowIncomeError: String? = null,
+    val cashflowError: String? = null,
     val transactionsError: String? = null,
     val canGoNext: Boolean = false
 ) {
@@ -179,10 +183,12 @@ class ReportViewModel(
                     isTrendLoading = true,
                     isExpenseTrendLoading = true,
                     isCashflowIncomeLoading = true,
+                    isCashflowLoading = true,
                     isTransactionsLoading = true,
                     trendError = null,
                     expenseTrendError = null,
                     cashflowIncomeError = null,
+                    cashflowError = null,
                     transactionsError = null
                 )
             }
@@ -221,6 +227,9 @@ class ReportViewModel(
                         type = "EXPENSE"
                     )
                 }
+                val cashflowSummaryDeferred = async {
+                    reportRepository.getCashflowSummary(period = period)
+                }
 
                 applyIncomeTrendResult(
                     result = incomeTrendDeferred.await(),
@@ -231,6 +240,7 @@ class ReportViewModel(
                 if (cashflowIncomeDeferred != null) {
                     applyCashflowIncomeResult(cashflowIncomeDeferred.await(), expectedPeriod = period)
                 }
+                applyCashflowSummaryResult(cashflowSummaryDeferred.await(), expectedPeriod = period)
                 applyTransactionsResult(txnDeferred.await(), expectedPeriod = period)
             }
         }
@@ -350,6 +360,32 @@ class ReportViewModel(
                     it.copy(
                         isCashflowIncomeLoading = false,
                         cashflowIncomeError = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyCashflowSummaryResult(
+        result: ReportResult<CashflowSummaryData>,
+        expectedPeriod: String
+    ) {
+        if (_state.value.periodKey != expectedPeriod) return
+        when (result) {
+            is ReportResult.Success -> {
+                _state.update {
+                    it.copy(
+                        cashflowSummary = result.data,
+                        isCashflowLoading = false,
+                        cashflowError = null
+                    )
+                }
+            }
+            is ReportResult.Failure -> {
+                _state.update {
+                    it.copy(
+                        isCashflowLoading = false,
+                        cashflowError = result.message
                     )
                 }
             }

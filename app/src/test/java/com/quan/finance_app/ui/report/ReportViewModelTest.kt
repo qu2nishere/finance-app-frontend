@@ -1,5 +1,6 @@
 package com.quan.finance_app.ui.report
 
+import com.quan.finance_app.data.CashflowSummaryData
 import com.quan.finance_app.data.CategoryBreakdownItem
 import com.quan.finance_app.data.DailyTransactionGroup
 import com.quan.finance_app.data.MonthlyBarPoint
@@ -8,6 +9,7 @@ import com.quan.finance_app.data.MonthlyTrendData
 import com.quan.finance_app.data.ReportRepository
 import com.quan.finance_app.data.ReportResult
 import com.quan.finance_app.data.ReportTransactionItem
+import com.quan.finance_app.data.WalletCashflowItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -57,14 +59,19 @@ class ReportViewModelTest {
         assertFalse(state.isTrendLoading)
         assertFalse(state.isExpenseTrendLoading)
         assertFalse(state.isCashflowIncomeLoading)
+        assertFalse(state.isCashflowLoading)
         assertFalse(state.isTransactionsLoading)
         assertNull(state.trendError)
         assertNull(state.expenseTrendError)
         assertNull(state.cashflowIncomeError)
+        assertNull(state.cashflowError)
         assertNull(state.transactionsError)
         assertEquals(18_200_000L, state.incomeTrend?.selectedAmount)
         assertEquals(18_200_000L, state.cashflowIncomeTrend?.selectedAmount)
         assertEquals(9_712_000L, state.expenseTrend?.selectedAmount)
+        assertEquals(11_510_000L, state.cashflowSummary?.openingBalance)
+        assertEquals(19_998_000L, state.cashflowSummary?.closingBalance)
+        assertEquals(1, state.cashflowSummary?.wallets?.size)
         assertEquals(5, state.incomeTrend?.points?.size)
         assertEquals(5, state.expenseTrend?.points?.size)
         assertEquals(285_000L, state.expenseTransactions?.monthTotalAmount)
@@ -103,6 +110,7 @@ class ReportViewModelTest {
         assertTrue(fakeRepo.trendCalls.any { it.type == "INCOME" })
         assertTrue(fakeRepo.trendCalls.any { it.type == "EXPENSE" })
         assertEquals("2026-07", fakeRepo.lastTransactionsPeriod)
+        assertEquals("2026-07", fakeRepo.lastCashflowSummaryPeriod)
 
         // Tiến về lại tháng hiện tại → canGoNext = false
         vm.goNextMonth()
@@ -174,10 +182,12 @@ class ReportViewModelTest {
         assertFalse(state.isTrendLoading)
         assertFalse(state.isExpenseTrendLoading)
         assertFalse(state.isCashflowIncomeLoading)
+        assertFalse(state.isCashflowLoading)
         assertFalse(state.isTransactionsLoading)
         assertNotNull(state.trendError)
         assertNotNull(state.expenseTrendError)
         assertNotNull(state.cashflowIncomeError)
+        assertNotNull(state.cashflowError)
         assertNotNull(state.transactionsError)
         assertTrue(state.trendError!!.contains("Không kết nối được"))
     }
@@ -196,6 +206,7 @@ class ReportViewModelTest {
         var lastTrendCategoryId: String? = null
         var lastTransactionsPeriod: String? = null
         var lastTransactionsDate: LocalDate? = null
+        var lastCashflowSummaryPeriod: String? = null
 
         override suspend fun getMonthlyTrend(
             period: String,
@@ -296,6 +307,38 @@ class ReportViewModelTest {
                     filteredTotalAmount = filtered,
                     filteredTxnCount = if (date != null) 1 else 3,
                     days = listOf(day22)
+                )
+            )
+        }
+
+        override suspend fun getCashflowSummary(period: String): ReportResult<CashflowSummaryData> {
+            lastCashflowSummaryPeriod = period
+            if (shouldFail) {
+                return ReportResult.Failure("Không kết nối được máy chủ.", "NETWORK_ERROR")
+            }
+            return ReportResult.Success(
+                CashflowSummaryData(
+                    period = period,
+                    currencyCode = "VND",
+                    openingBalance = 11_510_000L,
+                    totalIncome = 18_200_000L,
+                    totalExpense = 9_712_000L,
+                    closingBalance = 19_998_000L,
+                    wallets = listOf(
+                        WalletCashflowItem(
+                            walletId = "w-1",
+                            walletName = "Vietcombank",
+                            walletKind = "BANK",
+                            color = "#0E9F6E",
+                            accountMask = null,
+                            openingBalance = 10_000_000L,
+                            totalIncome = 18_200_000L,
+                            totalExpense = 10_300_000L,
+                            netFlow = 7_900_000L,
+                            closingBalance = 17_900_000L,
+                            includeInTotal = true
+                        )
+                    )
                 )
             )
         }

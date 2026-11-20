@@ -21,4 +21,9 @@ interface ReportApi {
         @Query("type") type: String? = null,
         @Query("categoryId") categoryId: String? = null
     ): Response<MonthlyTransactionsDto>
+
+    @GET("api/stats/cashflow-summary")
+    suspend fun getCashflowSummary(
+        @Query("period") period: String
+    ): Response<CashflowSummaryDto>
 }
