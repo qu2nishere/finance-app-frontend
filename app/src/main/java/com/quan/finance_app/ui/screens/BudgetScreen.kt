@@ -40,11 +40,9 @@ fun BudgetScreen(
         contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // 1. Top Header: Title "Ngân sách" + "+ Thêm" Button
+        // 1. Top Header: Title "Ngân sách"
         item {
-            BudgetHeader(
-                onAddClick = { onNavigateToSavingsGoals() }
-            )
+            BudgetHeader()
         }
 
         // 2. Main Monthly Budget Overview Card
@@ -207,23 +205,8 @@ fun BudgetScreen(
 // -------------------------------------------------------------------------
 
 @Composable
-fun BudgetHeader(onAddClick: () -> Unit) {
-    MfTabHeader(title = "Ngân sách") {
-        Surface(
-            modifier = Modifier.clickable(onClick = onAddClick),
-            shape = RoundedCornerShape(20.dp),
-            color = Blue50
-        ) {
-            Text(
-                text = "+ Thêm",
-                fontFamily = FontCore,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = Blue600,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-            )
-        }
-    }
+fun BudgetHeader() {
+    MfTabHeader(title = "Ngân sách")
 }
 
 @Composable
