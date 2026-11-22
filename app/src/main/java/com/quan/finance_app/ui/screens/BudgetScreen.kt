@@ -5,16 +5,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CardGiftcard
-import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,14 +26,65 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.quan.finance_app.data.CategoryLimitItem
+import com.quan.finance_app.data.CurrentBudgetData
+import com.quan.finance_app.data.LimitStatus
+import com.quan.finance_app.ui.budget.AddCategoryLimitSheet
+import com.quan.finance_app.ui.budget.BudgetUiState
+import com.quan.finance_app.ui.budget.BudgetViewModel
+import com.quan.finance_app.ui.components.core.MfInfoBanner
 import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.theme.*
+import kotlin.math.roundToInt
+
+@Composable
+fun BudgetRoute(
+    onNavigateToSavingsGoals: () -> Unit = {},
+    budgetViewModel: BudgetViewModel = viewModel(),
+    modifier: Modifier = Modifier
+) {
+    val state by budgetViewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        budgetViewModel.load()
+    }
+
+    BudgetScreen(
+        state = state,
+        onRefresh = budgetViewModel::load,
+        onOpenAddLimit = budgetViewModel::openCreateSheet,
+        onEditLimit = budgetViewModel::openEditSheet,
+        onNavigateToSavingsGoals = onNavigateToSavingsGoals,
+        modifier = modifier
+    )
+
+    if (state.sheetOpen) {
+        AddCategoryLimitSheet(
+            availableCategories = state.availableCategories,
+            editingLimit = state.editingLimit,
+            submitting = state.submitting,
+            errorMessage = state.actionError,
+            onDismiss = budgetViewModel::dismissSheet,
+            onCreate = budgetViewModel::createLimit,
+            onUpdate = budgetViewModel::updateLimit,
+            onDelete = budgetViewModel::deleteLimit
+        )
+    }
+}
 
 @Composable
 fun BudgetScreen(
+    state: BudgetUiState = BudgetUiState(),
+    onRefresh: () -> Unit = {},
+    onOpenAddLimit: () -> Unit = {},
+    onEditLimit: (CategoryLimitItem) -> Unit = {},
     onNavigateToSavingsGoals: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val budget = state.budget
+    val limits = budget?.limits.orEmpty()
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -47,7 +99,56 @@ fun BudgetScreen(
 
         // 2. Main Monthly Budget Overview Card
         item {
-            TotalMonthlyBudgetCard()
+            when {
+                state.loading && budget == null -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Ink100)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Blue500, strokeWidth = 2.5.dp)
+                        }
+                    }
+                }
+                state.errorMessage != null && budget == null -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Alert100)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            MfInfoBanner(
+                                text = state.errorMessage,
+                                icon = Icons.Outlined.WarningAmber,
+                                background = Alert50,
+                                contentColor = Alert600,
+                                borderColor = Alert100
+                            )
+                            Button(
+                                onClick = onRefresh,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Blue500)
+                            ) {
+                                Text("Thử lại", fontFamily = FontCore, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+                budget != null -> {
+                    TotalMonthlyBudgetCard(budget = budget)
+                }
+            }
         }
 
         // 3. Section "Theo danh mục"
@@ -62,74 +163,86 @@ fun BudgetScreen(
             )
         }
 
-        // 4. Category Budget Cards
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Card 1: Ăn uống (Vượt hạn mức - Alert Red)
-                CategoryBudgetCard(
-                    icon = Icons.Outlined.Storefront,
-                    iconBg = Alert50,
-                    iconTint = Alert500,
-                    title = "Ăn uống",
-                    spentAmount = "3,3tr",
-                    limitAmount = "3,0tr",
-                    progress = 1.0f,
-                    progressColor = Alert500,
-                    borderColor = Alert300,
-                    isOverBudget = true,
-                    overAmount = "302.000₫"
-                )
-
-                // Card 2: Di chuyển (Bình thường - Orange)
-                CategoryBudgetCard(
-                    icon = Icons.Outlined.DirectionsCar,
-                    iconBg = Blue50,
-                    iconTint = Blue500,
-                    title = "Di chuyển",
-                    spentAmount = "2,0tr",
-                    limitAmount = "2,5tr",
-                    progress = 0.80f,
-                    progressColor = Heat500,
-                    borderColor = Ink100,
-                    isOverBudget = false
-                )
-
-                // Card 3: Mua sắm (Bình thường - Orange)
-                CategoryBudgetCard(
-                    icon = Icons.Outlined.ShoppingBag,
-                    iconBg = Color(0xFFF2F0FF),
-                    iconTint = CatBills,
-                    title = "Mua sắm",
-                    spentAmount = "1,5tr",
-                    limitAmount = "2,0tr",
-                    progress = 0.75f,
-                    progressColor = Heat500,
-                    borderColor = Ink100,
-                    isOverBudget = false
-                )
-
-                // Button: Đặt ngân sách cho danh mục khác
+        // 4. Category Budget Cards or Empty State
+        if (limits.isEmpty() && !state.loading) {
+            item {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clickable { /* Add new category budget */ },
-                    shape = RoundedCornerShape(16.dp),
-                    color = Blue50,
-                    border = BorderStroke(1.dp, Blue100)
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Ink100)
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "+ Đặt ngân sách cho danh mục khác",
-                            fontFamily = FontCore,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = Blue600
+                            text = "Chưa có hạn mức danh mục",
+                            style = MoneyFlowTheme.typography.title3,
+                            color = MoneyFlowTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = "Đặt hạn mức cho từng danh mục chi tiêu để theo dõi sát mức chi tháng này.",
+                            style = MoneyFlowTheme.typography.bodySm,
+                            color = MoneyFlowTheme.colors.textSecondary
                         )
                     }
+                }
+            }
+        } else {
+            items(limits, key = { it.id }) { limit ->
+                val progress = if (limit.limitAmount > 0L) {
+                    (limit.spentAmount.toFloat() / limit.limitAmount.toFloat()).coerceIn(0f, 1f)
+                } else 0f
+
+                val (iconBg, iconTint, progressColor, borderColor) = when (limit.status) {
+                    LimitStatus.EXCEEDED -> QuadColor(Alert50, Alert500, Alert500, Alert300)
+                    LimitStatus.WARNING -> QuadColor(Sun50, Sun600, Sun500, Sun300)
+                    LimitStatus.OK -> QuadColor(Blue50, Blue600, Heat500, Ink100)
+                }
+
+                val isOverBudget = limit.status == LimitStatus.EXCEEDED
+                val overAmount = if (isOverBudget) formatVnd(limit.spentAmount - limit.limitAmount) else ""
+
+                CategoryBudgetCard(
+                    icon = getCategoryIcon(limit.categoryName),
+                    iconBg = iconBg,
+                    iconTint = iconTint,
+                    title = limit.categoryName,
+                    spentAmount = shortVnd(limit.spentAmount),
+                    limitAmount = shortVnd(limit.limitAmount),
+                    progress = progress,
+                    progressColor = progressColor,
+                    borderColor = borderColor,
+                    isOverBudget = isOverBudget,
+                    overAmount = overAmount,
+                    onClick = { onEditLimit(limit) }
+                )
+            }
+        }
+
+        // Button: Đặt ngân sách cho danh mục khác
+        item {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clickable(onClick = onOpenAddLimit),
+                shape = RoundedCornerShape(16.dp),
+                color = Blue50,
+                border = BorderStroke(1.dp, Blue100)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text(
+                        text = "+ Đặt ngân sách cho danh mục khác",
+                        fontFamily = FontCore,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = Blue600
+                    )
                 }
             }
         }
@@ -168,7 +281,6 @@ fun BudgetScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Goal 1: Du lịch Đà Lạt
                 SavingsGoalCard(
                     modifier = Modifier
                         .weight(1f)
@@ -182,7 +294,6 @@ fun BudgetScreen(
                     infoText = "4,5/10tr · T12"
                 )
 
-                // Goal 2: Quỹ dự phòng
                 SavingsGoalCard(
                     modifier = Modifier
                         .weight(1f)
@@ -200,6 +311,13 @@ fun BudgetScreen(
     }
 }
 
+private data class QuadColor(
+    val iconBg: Color,
+    val iconTint: Color,
+    val progressColor: Color,
+    val borderColor: Color
+)
+
 // -------------------------------------------------------------------------
 // Sub-components
 // -------------------------------------------------------------------------
@@ -210,13 +328,26 @@ fun BudgetHeader() {
 }
 
 @Composable
-fun TotalMonthlyBudgetCard() {
+fun TotalMonthlyBudgetCard(budget: CurrentBudgetData) {
+    val monthNumber = budget.periodKey.substringAfter("-", "").toIntOrNull()
+    val monthTitle = if (monthNumber != null) "Ngân sách tháng $monthNumber" else "Ngân sách tháng này"
+    val totalLimit = budget.totalLimit
+    val totalSpent = budget.totalSpent
+    val isOver = totalLimit > 0L && totalSpent > totalLimit
+    val progress = if (totalLimit > 0L) (totalSpent.toFloat() / totalLimit.toFloat()).coerceIn(0f, 1f) else 0f
+    val usedPercent = if (totalLimit > 0L) ((totalSpent * 100.0) / totalLimit).roundToInt() else 0
+    val barColor = when {
+        isOver -> Alert500
+        usedPercent >= 80 -> Sun500
+        else -> Heat500
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Ink100)
+        border = BorderStroke(1.dp, if (isOver) Alert300 else Ink100)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -225,13 +356,13 @@ fun TotalMonthlyBudgetCard() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Ngân sách tháng 8",
+                    text = monthTitle,
                     fontFamily = FontCore,
                     fontSize = 14.sp,
                     color = MoneyFlowTheme.colors.textSecondary
                 )
                 Text(
-                    text = "còn 12 ngày",
+                    text = "còn ${budget.daysLeft} ngày",
                     fontFamily = FontCore,
                     fontSize = 13.sp,
                     color = MoneyFlowTheme.colors.textSecondary
@@ -242,15 +373,15 @@ fun TotalMonthlyBudgetCard() {
 
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = "9,7tr",
+                    text = shortVnd(totalSpent),
                     fontFamily = FontMono,
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
-                    color = Heat500,
+                    color = if (isOver) Alert500 else Heat500,
                     letterSpacing = (-0.5).sp
                 )
                 Text(
-                    text = " / 12,0tr",
+                    text = " / ${shortVnd(totalLimit)}",
                     fontFamily = FontMono,
                     fontWeight = FontWeight.Medium,
                     fontSize = 16.sp,
@@ -261,7 +392,6 @@ fun TotalMonthlyBudgetCard() {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -270,34 +400,65 @@ fun TotalMonthlyBudgetCard() {
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(fraction = 0.81f)
+                        .fillMaxWidth(fraction = progress)
                         .fillMaxHeight()
-                        .background(Heat500, RoundedCornerShape(4.dp))
+                        .background(barColor, RoundedCornerShape(4.dp))
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
-                        append("Đã dùng 81% · còn ")
+            if (totalLimit <= 0L) {
+                Text(
+                    text = "Chưa có hạn mức nào trong kỳ này — bấm nút bên dưới để đặt hạn mức.",
+                    fontFamily = FontCore,
+                    fontSize = 13.sp,
+                    color = Ink600
+                )
+            } else if (isOver) {
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
+                            append("Đã dùng $usedPercent% · vượt ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = Alert500,
+                                fontFamily = FontMono,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        ) {
+                            append(formatVnd(totalSpent - totalLimit))
+                        }
                     }
-                    withStyle(
-                        SpanStyle(
-                            color = Grow500,
-                            fontFamily = FontMono,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    ) {
-                        append("2.288.000₫")
+                )
+            } else {
+                val remaining = (totalLimit - totalSpent).coerceAtLeast(0L)
+                val perDay = if (budget.daysLeft > 0) remaining / budget.daysLeft else 0L
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
+                            append("Đã dùng $usedPercent% · còn ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = Grow500,
+                                fontFamily = FontMono,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        ) {
+                            append(formatVnd(remaining))
+                        }
+                        if (budget.daysLeft > 0) {
+                            withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
+                                append(" (~${shortVnd(perDay)}/ngày)")
+                            }
+                        }
                     }
-                    withStyle(SpanStyle(color = Ink600, fontFamily = FontCore, fontSize = 13.sp)) {
-                        append(" (~190k/ngày)")
-                    }
-                }
-            )
+                )
+            }
         }
     }
 }
@@ -314,10 +475,13 @@ fun CategoryBudgetCard(
     progressColor: Color,
     borderColor: Color,
     isOverBudget: Boolean,
-    overAmount: String = ""
+    overAmount: String = "",
+    onClick: () -> Unit = {}
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
         shadowElevation = 2.dp,

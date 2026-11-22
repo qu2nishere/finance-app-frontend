@@ -32,6 +32,7 @@ import com.quan.finance_app.ui.auth.AuthViewModel
 import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
+import com.quan.finance_app.ui.budget.BudgetViewModel
 import com.quan.finance_app.ui.home.HomeViewModel
 import com.quan.finance_app.ui.report.ReportViewModel
 
@@ -81,7 +82,8 @@ enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
 fun MainApp(
     authViewModel: AuthViewModel = viewModel(),
     homeViewModel: HomeViewModel = viewModel(),
-    reportViewModel: ReportViewModel = viewModel()
+    reportViewModel: ReportViewModel = viewModel(),
+    budgetViewModel: BudgetViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
     val context = LocalContext.current
@@ -96,6 +98,7 @@ fun MainApp(
                 isLoggedIn = true
                 authViewModel.consumeNavigation()
                 homeViewModel.loadData()
+                budgetViewModel.load()
             }
             auth.registerSuccess -> { authScreen = AuthScreen.REGISTER_2; authViewModel.consumeNavigation() }
         }
@@ -225,7 +228,8 @@ fun MainApp(
                             onOpenNotifications = { push(Route.Notifications) }
                         )
                         1 -> ReportRoute(reportViewModel = reportViewModel)
-                        2 -> BudgetScreen(
+                        2 -> BudgetRoute(
+                            budgetViewModel = budgetViewModel,
                             onNavigateToSavingsGoals = { push(Route.SavingsGoals) }
                         )
                         3 -> ProfileScreen(
@@ -324,6 +328,7 @@ fun MainApp(
                 onOpenAutoSave = { showAutoSaveOverAdd = true },
                 onTransactionCreated = {
                     homeViewModel.loadData()
+                    budgetViewModel.load()
                 }
             )
         }
