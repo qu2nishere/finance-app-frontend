@@ -3,13 +3,20 @@ package com.quan.finance_app.data
 import com.google.gson.Gson
 import com.quan.finance_app.data.remote.BudgetApi
 import com.quan.finance_app.data.remote.CategoryLimitDto
+import com.quan.finance_app.data.remote.CreateDepositRequestDto
+import com.quan.finance_app.data.remote.CreateGoalRequestDto
 import com.quan.finance_app.data.remote.CreateLimitRequestDto
 import com.quan.finance_app.data.remote.CurrentBudgetDto
+import com.quan.finance_app.data.remote.DepositResultResponseDto
+import com.quan.finance_app.data.remote.GoalDepositResponseDto
+import com.quan.finance_app.data.remote.GoalResponseDto
 import com.quan.finance_app.data.remote.ProblemDetailDto
+import com.quan.finance_app.data.remote.UpdateGoalRequestDto
 import com.quan.finance_app.data.remote.UpdateLimitRequestDto
 import kotlinx.coroutines.CancellationException
 import retrofit2.Response
 import java.io.IOException
+import java.time.Instant
 import java.time.LocalDate
 
 sealed interface BudgetResult<out T> {
@@ -43,6 +50,41 @@ data class CurrentBudgetData(
     val totalLimit: Long,
     val totalSpent: Long,
     val limits: List<CategoryLimitItem>
+)
+
+enum class GoalStatus {
+    ACTIVE,
+    COMPLETED,
+    PAUSED,
+    ARCHIVED
+}
+
+data class SavingsGoalItem(
+    val id: String,
+    val name: String,
+    val icon: String,
+    val color: String,
+    val targetAmount: Long,
+    val savedAmount: Long,
+    val targetDate: LocalDate?,
+    val walletId: String?,
+    val walletName: String?,
+    val priority: Int,
+    val status: GoalStatus,
+    val completedAt: Instant?,
+    val note: String?
+)
+
+data class GoalDepositItem(
+    val id: String,
+    val amount: Long,
+    val depositedAt: Instant?,
+    val note: String?
+)
+
+data class DepositResultItem(
+    val deposit: GoalDepositItem,
+    val goal: SavingsGoalItem
 )
 
 /**
@@ -104,6 +146,90 @@ open class BudgetRepository(private val api: BudgetApi? = null) {
     open suspend fun deleteLimit(id: String): BudgetResult<Unit> {
         val client = requireNotNull(api) { "BudgetApi chưa được khởi tạo" }
         return executeUnit { client.deleteLimit(id) }
+    }
+
+    open suspend fun getGoals(status: GoalStatus? = null): BudgetResult<List<SavingsGoalItem>> {
+        val client = requireNotNull(api) { "BudgetApi chưa được khởi tạo" }
+        return execute(
+            request = { client.getGoals(status?.name) },
+            mapper = { list -> list.map(GoalResponseDto::toDomain) }
+        )
+    }
+
+    open suspend fun createGoal(
+        name: String,
+        icon: String?,
+        color: String?,
+        targetAmount: Long,
+        targetDate: LocalDate?,
+        walletId: String?,
+        walletName: String?,
+        priority: Int?,
+        note: String?
+    ): BudgetResult<SavingsGoalItem> {
+        val client = requireNotNull(api) { "BudgetApi chưa được khởi tạo" }
+        val body = CreateGoalRequestDto(
+            name = name,
+            icon = icon,
+            color = color,
+            targetAmount = targetAmount,
+            targetDate = targetDate?.toString(),
+            walletId = walletId,
+            walletName = walletName,
+            priority = priority,
+            note = note
+        )
+        return execute(
+            request = { client.createGoal(body) },
+            mapper = { it.toDomain() }
+        )
+    }
+
+    open suspend fun updateGoal(
+        id: String,
+        name: String?,
+        icon: String?,
+        color: String?,
+        targetAmount: Long?,
+        targetDate: LocalDate?,
+        walletId: String?,
+        walletName: String?,
+        priority: Int?,
+        note: String?
+    ): BudgetResult<SavingsGoalItem> {
+        val client = requireNotNull(api) { "BudgetApi chưa được khởi tạo" }
+        val body = UpdateGoalRequestDto(
+            name = name,
+            icon = icon,
+            color = color,
+            targetAmount = targetAmount,
+            targetDate = targetDate?.toString(),
+            walletId = walletId,
+            walletName = walletName,
+            priority = priority,
+            note = note
+        )
+        return execute(
+            request = { client.updateGoal(id, body) },
+            mapper = { it.toDomain() }
+        )
+    }
+
+    open suspend fun deleteGoal(id: String): BudgetResult<Unit> {
+        val client = requireNotNull(api) { "BudgetApi chưa được khởi tạo" }
+        return executeUnit { client.deleteGoal(id) }
+    }
+
+    open suspend fun depositToGoal(
+        goalId: String,
+        amount: Long,
+        note: String? = null
+    ): BudgetResult<DepositResultItem> {
+        val client = requireNotNull(api) { "BudgetApi chưa được khởi tạo" }
+        return execute(
+            request = { client.depositToGoal(goalId, CreateDepositRequestDto(amount = amount, note = note)) },
+            mapper = { it.toDomain() }
+        )
     }
 
     protected suspend fun <Dto, Domain> execute(
@@ -197,4 +323,37 @@ internal fun CategoryLimitDto.toDomain(): CategoryLimitItem = CategoryLimitItem(
         "WARNING" -> LimitStatus.WARNING
         else -> LimitStatus.OK
     }
+)
+
+internal fun GoalResponseDto.toDomain(): SavingsGoalItem = SavingsGoalItem(
+    id = id ?: "",
+    name = name ?: "Mục tiêu",
+    icon = icon ?: "CardGiftcard",
+    color = color?.trim() ?: "#16A34A",
+    targetAmount = targetAmount ?: 0L,
+    savedAmount = savedAmount ?: 0L,
+    targetDate = targetDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
+    walletId = walletId,
+    walletName = walletName,
+    priority = priority ?: 0,
+    status = when (status?.uppercase()) {
+        "COMPLETED" -> GoalStatus.COMPLETED
+        "PAUSED" -> GoalStatus.PAUSED
+        "ARCHIVED" -> GoalStatus.ARCHIVED
+        else -> GoalStatus.ACTIVE
+    },
+    completedAt = completedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+    note = note
+)
+
+internal fun GoalDepositResponseDto.toDomain(): GoalDepositItem = GoalDepositItem(
+    id = id ?: "",
+    amount = amount ?: 0L,
+    depositedAt = depositedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+    note = note
+)
+
+internal fun DepositResultResponseDto.toDomain(): DepositResultItem = DepositResultItem(
+    deposit = deposit?.toDomain() ?: GoalDepositItem("", 0L, null, null),
+    goal = goal?.toDomain() ?: SavingsGoalItem("", "Mục tiêu", "CardGiftcard", "#16A34A", 0L, 0L, null, null, null, 0, GoalStatus.ACTIVE, null, null)
 )

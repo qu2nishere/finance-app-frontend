@@ -30,9 +30,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.data.CategoryLimitItem
 import com.quan.finance_app.data.CurrentBudgetData
 import com.quan.finance_app.data.LimitStatus
+import com.quan.finance_app.data.SavingsGoalItem
 import com.quan.finance_app.ui.budget.AddCategoryLimitSheet
 import com.quan.finance_app.ui.budget.BudgetUiState
 import com.quan.finance_app.ui.budget.BudgetViewModel
+import com.quan.finance_app.ui.budget.GoalsViewModel
 import com.quan.finance_app.ui.components.core.MfInfoBanner
 import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.theme.*
@@ -41,21 +43,32 @@ import kotlin.math.roundToInt
 @Composable
 fun BudgetRoute(
     onNavigateToSavingsGoals: () -> Unit = {},
+    onCreateGoal: () -> Unit = {},
+    onEditGoal: (String) -> Unit = {},
     budgetViewModel: BudgetViewModel = viewModel(),
+    goalsViewModel: GoalsViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val state by budgetViewModel.state.collectAsState()
+    val goalsState by goalsViewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
         budgetViewModel.load()
+        goalsViewModel.load()
     }
 
     BudgetScreen(
         state = state,
-        onRefresh = budgetViewModel::load,
+        activeGoals = goalsState.activeGoals.take(2),
+        onRefresh = {
+            budgetViewModel.load()
+            goalsViewModel.load()
+        },
         onOpenAddLimit = budgetViewModel::openCreateSheet,
         onEditLimit = budgetViewModel::openEditSheet,
         onNavigateToSavingsGoals = onNavigateToSavingsGoals,
+        onCreateFirstGoal = onCreateGoal,
+        onOpenGoal = onEditGoal,
         modifier = modifier
     )
 
@@ -76,10 +89,13 @@ fun BudgetRoute(
 @Composable
 fun BudgetScreen(
     state: BudgetUiState = BudgetUiState(),
+    activeGoals: List<SavingsGoalItem> = emptyList(),
     onRefresh: () -> Unit = {},
     onOpenAddLimit: () -> Unit = {},
     onEditLimit: (CategoryLimitItem) -> Unit = {},
     onNavigateToSavingsGoals: () -> Unit = {},
+    onCreateFirstGoal: () -> Unit = {},
+    onOpenGoal: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val budget = state.budget
@@ -275,37 +291,77 @@ fun BudgetScreen(
             }
         }
 
-        // 6. Savings Goals Cards (Clickable to open Savings Goals)
+        // 6. Savings Goals Cards (D9: up to 2 ACTIVE goals, or empty state "+ Tạo mục tiêu đầu tiên")
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                SavingsGoalCard(
+            if (activeGoals.isEmpty()) {
+                Surface(
                     modifier = Modifier
-                        .weight(1f)
-                        .clickable { onNavigateToSavingsGoals() },
-                    icon = Icons.Outlined.CardGiftcard,
-                    iconBg = Grow50,
-                    iconTint = Grow500,
-                    title = "Du lịch Đà Lạt",
-                    progress = 0.45f,
-                    progressColor = Grow500,
-                    infoText = "4,5/10tr · T12"
-                )
-
-                SavingsGoalCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onNavigateToSavingsGoals() },
-                    icon = Icons.Outlined.Shield,
-                    iconBg = Ink100,
-                    iconTint = Ink600,
-                    title = "Quỹ dự phòng",
-                    progress = 0.22f,
-                    progressColor = Ink600,
-                    infoText = "11/50tr"
-                )
+                        .fillMaxWidth()
+                        .clickable(onClick = onCreateFirstGoal),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 2.dp,
+                    border = BorderStroke(1.dp, Grow100)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Chưa có mục tiêu tiết kiệm",
+                            style = MoneyFlowTheme.typography.title3,
+                            color = MoneyFlowTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = "Đặt mục tiêu tích luỹ cho chuyến đi, quỹ dự phòng hoặc món đồ bạn muốn mua.",
+                            style = MoneyFlowTheme.typography.bodySm,
+                            color = MoneyFlowTheme.colors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Grow50,
+                            border = BorderStroke(1.dp, Grow100)
+                        ) {
+                            Text(
+                                text = "+ Tạo mục tiêu đầu tiên",
+                                fontFamily = FontCore,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = Grow600,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    activeGoals.forEachIndexed { idx, goal ->
+                        val progress = if (goal.targetAmount > 0L) {
+                            (goal.savedAmount.toFloat() / goal.targetAmount.toFloat()).coerceIn(0f, 1f)
+                        } else 0f
+                        val accent = parseGoalAccent(goal.color, if (idx == 0) Grow500 else Blue500)
+                        val deadlineSuffix = goal.targetDate?.let { " · T${it.monthValue}" } ?: ""
+                        SavingsGoalCard(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onOpenGoal(goal.id) },
+                            icon = if (idx == 0) Icons.Outlined.CardGiftcard else Icons.Outlined.Shield,
+                            iconBg = accent.copy(alpha = 0.12f),
+                            iconTint = accent,
+                            title = goal.name,
+                            progress = progress,
+                            progressColor = accent,
+                            infoText = "${shortVnd(goal.savedAmount)}/${shortVnd(goal.targetAmount)}$deadlineSuffix"
+                        )
+                    }
+                    if (activeGoals.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
