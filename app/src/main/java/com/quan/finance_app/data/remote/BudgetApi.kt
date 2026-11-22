@@ -31,4 +31,41 @@ interface BudgetApi {
     suspend fun deleteLimit(
         @Path("id") id: String
     ): Response<Unit>
+
+    @GET("api/goals")
+    suspend fun getGoals(
+        @Query("status") status: String? = null
+    ): Response<List<GoalResponseDto>>
+
+    @POST("api/goals")
+    suspend fun createGoal(
+        @Body body: CreateGoalRequestDto
+    ): Response<GoalResponseDto>
+
+    @GET("api/goals/{id}")
+    suspend fun getGoal(
+        @Path("id") id: String
+    ): Response<GoalResponseDto>
+
+    @PATCH("api/goals/{id}")
+    suspend fun updateGoal(
+        @Path("id") id: String,
+        @Body body: UpdateGoalRequestDto
+    ): Response<GoalResponseDto>
+
+    @DELETE("api/goals/{id}")
+    suspend fun deleteGoal(
+        @Path("id") id: String
+    ): Response<Unit>
+
+    @POST("api/goals/{id}/deposits")
+    suspend fun depositToGoal(
+        @Path("id") id: String,
+        @Body body: CreateDepositRequestDto
+    ): Response<DepositResultResponseDto>
+
+    @GET("api/goals/{id}/deposits")
+    suspend fun getGoalDeposits(
+        @Path("id") id: String
+    ): Response<List<GoalDepositResponseDto>>
 }

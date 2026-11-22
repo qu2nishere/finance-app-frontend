@@ -33,6 +33,7 @@ import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
 import com.quan.finance_app.ui.budget.BudgetViewModel
+import com.quan.finance_app.ui.budget.GoalsViewModel
 import com.quan.finance_app.ui.home.HomeViewModel
 import com.quan.finance_app.ui.report.ReportViewModel
 
@@ -59,7 +60,7 @@ sealed interface Route {
     data class EditIncomeCategory(val category: String) : Route
     data object AutoSave : Route
     data object SavingsGoals : Route
-    data object EditGoal : Route
+    data class EditGoal(val goalId: String? = null) : Route
     data object AllTransactions : Route
     data class TransactionDetail(val title: String) : Route
     data object Wallets : Route
@@ -83,9 +84,11 @@ fun MainApp(
     authViewModel: AuthViewModel = viewModel(),
     homeViewModel: HomeViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel(),
-    budgetViewModel: BudgetViewModel = viewModel()
+    budgetViewModel: BudgetViewModel = viewModel(),
+    goalsViewModel: GoalsViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
+    val goalsState by goalsViewModel.state.collectAsState()
     val context = LocalContext.current
 
     var isLoggedIn by remember { mutableStateOf(false) }
@@ -99,6 +102,7 @@ fun MainApp(
                 authViewModel.consumeNavigation()
                 homeViewModel.loadData()
                 budgetViewModel.load()
+                goalsViewModel.load()
             }
             auth.registerSuccess -> { authScreen = AuthScreen.REGISTER_2; authViewModel.consumeNavigation() }
         }
@@ -114,7 +118,7 @@ fun MainApp(
     // để back quay lại đúng màn thu với số tiền/danh mục đang nhập dở
     var showAutoSaveOverAdd by remember { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
-    var showGoalDeposit by remember { mutableStateOf(false) }
+    var goalDepositTarget by remember { mutableStateOf<String?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showDeleteData by remember { mutableStateOf(false) }
 
@@ -177,13 +181,13 @@ fun MainApp(
     // Nút back của máy: đóng lớp phủ trước, sau đó mới lùi back stack
     BackHandler(
         enabled = backStack.isNotEmpty() || showAddSheet || showAutoSaveOverAdd || showScanReceipt ||
-            showGoalDeposit || showCategoryPicker || showDeleteData
+            goalDepositTarget != null || showCategoryPicker || showDeleteData
     ) {
         when {
             showAutoSaveOverAdd -> showAutoSaveOverAdd = false
             showDeleteData -> showDeleteData = false
             showCategoryPicker -> showCategoryPicker = false
-            showGoalDeposit -> showGoalDeposit = false
+            goalDepositTarget != null -> goalDepositTarget = null
             showScanReceipt -> showScanReceipt = false
             showAddSheet -> showAddSheet = false
             else -> pop()
@@ -230,7 +234,10 @@ fun MainApp(
                         1 -> ReportRoute(reportViewModel = reportViewModel)
                         2 -> BudgetRoute(
                             budgetViewModel = budgetViewModel,
-                            onNavigateToSavingsGoals = { push(Route.SavingsGoals) }
+                            goalsViewModel = goalsViewModel,
+                            onNavigateToSavingsGoals = { push(Route.SavingsGoals) },
+                            onCreateGoal = { push(Route.EditGoal(null)) },
+                            onEditGoal = { push(Route.EditGoal(it)) }
                         )
                         3 -> ProfileScreen(
                             onNavigateToCategories = { push(Route.Categories) },
@@ -269,12 +276,25 @@ fun MainApp(
                             onOpenAutoSave = { push(Route.AutoSave) }
                         )
                         Route.AutoSave -> AutoSaveSettingScreen(onBack = { pop() })
-                        Route.SavingsGoals -> SavingsGoalsScreen(
+                        Route.SavingsGoals -> SavingsGoalsRoute(
+                            goalsViewModel = goalsViewModel,
                             onBack = { pop() },
-                            onNavigateToEditGoal = { push(Route.EditGoal) },
-                            onDeposit = { showGoalDeposit = true }
+                            onAddGoal = { push(Route.EditGoal(null)) },
+                            onEditGoal = { push(Route.EditGoal(it)) },
+                            onDeposit = {
+                                goalsViewModel.clearActionError()
+                                goalDepositTarget = it
+                            }
                         )
-                        Route.EditGoal -> EditGoalScreen(onBack = { pop() })
+                        is Route.EditGoal -> EditGoalRoute(
+                            goalId = route.goalId,
+                            goalsViewModel = goalsViewModel,
+                            onBack = { pop() },
+                            onOpenDeposit = {
+                                goalsViewModel.clearActionError()
+                                goalDepositTarget = it
+                            }
+                        )
                         Route.AllTransactions -> AllTransactionsScreen(
                             onBack = { pop() },
                             onOpenTransaction = { push(Route.TransactionDetail(it)) }
@@ -354,12 +374,25 @@ fun MainApp(
             ScanReceiptScreen(onDismissRequest = { showScanReceipt = false })
         }
         // Hai lớp này tự vẽ scrim, nên chỉ fade + nhích nhẹ thay vì trượt cả màn
+        val depositGoal = goalsState.allGoals.firstOrNull { it.id == goalDepositTarget }
         AnimatedVisibility(
-            visible = showGoalDeposit,
+            visible = depositGoal != null,
             enter = scrimSheetIn,
             exit = scrimSheetOut
         ) {
-            GoalDepositSheet(onDismissRequest = { showGoalDeposit = false })
+            if (depositGoal != null) {
+                GoalDepositSheet(
+                    goal = depositGoal,
+                    submitting = goalsState.submitting,
+                    errorMessage = goalsState.actionError,
+                    onDismissRequest = { goalDepositTarget = null },
+                    onConfirmDeposit = { amount, note ->
+                        goalsViewModel.deposit(depositGoal.id, amount, note) {
+                            goalDepositTarget = null
+                        }
+                    }
+                )
+            }
         }
         AnimatedVisibility(
             visible = showDeleteData,
