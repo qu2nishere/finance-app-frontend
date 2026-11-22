@@ -325,6 +325,9 @@ fun MainApp(
                             onBack = { pop() },
                             onOpenSecurity = { push(Route.Security) },
                             onLogout = {
+                                authViewModel.logout()
+                                budgetViewModel.reset()
+                                goalsViewModel.reset()
                                 backStack.clear()
                                 selectedTab = 0
                                 authScreen = AuthScreen.LOGIN

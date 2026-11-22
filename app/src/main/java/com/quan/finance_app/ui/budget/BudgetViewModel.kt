@@ -109,6 +109,10 @@ class BudgetViewModel(
         _state.update { it.copy(actionError = null) }
     }
 
+    fun reset() {
+        _state.value = BudgetUiState()
+    }
+
     fun createLimit(
         category: ExpenseCategoryOption,
         limitAmount: Long,

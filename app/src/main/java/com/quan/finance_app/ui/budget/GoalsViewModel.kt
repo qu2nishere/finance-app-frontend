@@ -81,6 +81,10 @@ class GoalsViewModel(
         _state.update { it.copy(actionCompleted = false) }
     }
 
+    fun reset() {
+        _state.value = GoalsUiState()
+    }
+
     fun createGoal(
         name: String,
         targetAmount: Long,
