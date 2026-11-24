@@ -1,0 +1,4 @@
+# Gradle wrapper script phai giu LF de chay duoc tren Linux (CI runner).
+/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
