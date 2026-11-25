@@ -38,8 +38,8 @@ import com.quan.finance_app.ui.theme.*
  */
 @Composable
 fun LoginScreen(
-    onLogin: (email: String, password: String) -> Unit = { _, _ -> },
-    onGoogleLogin: () -> Unit = {},
+    onLogin: (email: String, password: String, rememberMe: Boolean) -> Unit = { _, _, _ -> },
+    onGoogleLogin: (rememberMe: Boolean) -> Unit = {},
     onGoToRegister: () -> Unit = {},
     onForgotPassword: () -> Unit = {},
     loading: Boolean = false,
@@ -175,7 +175,7 @@ fun LoginScreen(
 
             AuthPrimaryButton(
                 text = if (loading) "Đang đăng nhập…" else "Đăng nhập",
-                onClick = { if (!loading) onLogin(email, password) }
+                onClick = { if (!loading) onLogin(email, password, rememberMe) }
             )
 
             // Face ID
@@ -185,7 +185,7 @@ fun LoginScreen(
                     icon = Icons.Outlined.Face,
                     iconSize = 30.dp,
                     showChevron = true,
-                    onClick = { if (!loading) onLogin(email, password) }
+                    onClick = { if (!loading) onLogin(email, password, rememberMe) }
                 )
             }
 
@@ -213,13 +213,13 @@ fun LoginScreen(
                     label = "Google",
                     iconRes = com.quan.finance_app.R.drawable.ic_google,
                     modifier = Modifier.weight(1f),
-                    onClick = { if (!loading) onGoogleLogin() }
+                    onClick = { if (!loading) onGoogleLogin(rememberMe) }
                 )
                 SocialButton(
                     label = "Apple",
                     icon = Icons.Outlined.PhoneIphone,
                     modifier = Modifier.weight(1f),
-                    onClick = { if (!loading) onLogin(email, password) }
+                    onClick = { if (!loading) onLogin(email, password, rememberMe) }
                 )
             }
 

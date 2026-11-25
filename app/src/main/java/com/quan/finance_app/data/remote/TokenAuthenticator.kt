@@ -45,7 +45,12 @@ class TokenAuthenticator(
                 return response.request.withBearer(currentToken)
             }
 
-            val refresh = tokenStore.refreshToken ?: return expireSession(tokenStore)
+            // Không có token gửi đi lẫn không có refresh token lưu trữ -> chưa từng đăng nhập, không báo hết hạn
+            val refresh = tokenStore.refreshToken ?: return if (sentToken != null) {
+                expireSession(tokenStore)
+            } else {
+                null
+            }
             val refreshResponse = try {
                 refreshApi.refreshCall(RefreshRequestDto(refresh)).execute()
             } catch (_: IOException) {

@@ -28,15 +28,19 @@ class HomeViewModel(
     private val ledgerRepository: LedgerRepository = ServiceLocator.ledgerRepository
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(HomeUiState())
+    private val _state = MutableStateFlow(HomeUiState(isLoading = false))
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
-    init {
-        loadData()
+    private var loadJob: kotlinx.coroutines.Job? = null
+
+    fun reset() {
+        loadJob?.cancel()
+        _state.value = HomeUiState(isLoading = false)
     }
 
     fun loadData() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, errorMessage = null) }
             runCatching {
                 coroutineScope {
