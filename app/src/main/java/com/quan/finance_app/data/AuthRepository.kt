@@ -52,6 +52,11 @@ open class AuthRepository(
         tokenStore?.consumeSessionExpired() ?: run { fallbackSessionExpired.value = false }
     }
 
+    /** Kiểm tra xem còn token phiên hợp lệ (trong RAM hoặc đĩa) hay không trước khi cho vào khung chính. */
+    open suspend fun hasSession(): Boolean = withContext(Dispatchers.IO) {
+        requireTokenStore().isLoggedIn
+    }
+
     open suspend fun register(
         email: String,
         password: String,

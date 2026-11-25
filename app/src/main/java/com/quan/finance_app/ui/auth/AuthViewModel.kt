@@ -50,6 +50,7 @@ class AuthViewModel(
     companion object {
         const val SERVER_WEB_CLIENT_ID = "335542221014-44m3m8dcpsmbcdadev03dtqb2kfopgjk.apps.googleusercontent.com"
         const val SESSION_EXPIRED_MESSAGE = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+        const val MISSING_SESSION_MESSAGE = "Phiên đăng nhập không còn hiệu lực. Vui lòng đăng nhập lại."
     }
 
     private val _state = MutableStateFlow(AuthUiState())
@@ -170,9 +171,27 @@ class AuthViewModel(
         }
     }
 
-    /** Hoàn tất các bước thiết lập sau đăng ký / xác thực email để vào khung chính. */
+    /** Hoàn tất các bước thiết lập sau đăng ký để vào khung chính; không có phiên thì trả về Đăng nhập (D2). */
     fun completeOnboarding() {
-        _state.update { it.copy(session = SessionStatus.LoggedIn, registerSuccess = false) }
+        viewModelScope.launch {
+            if (repository.hasSession()) {
+                _state.update {
+                    it.copy(
+                        session = SessionStatus.LoggedIn,
+                        registerSuccess = false,
+                        errorMessage = null
+                    )
+                }
+            } else {
+                _state.update {
+                    it.copy(
+                        session = SessionStatus.LoggedOut,
+                        registerSuccess = false,
+                        errorMessage = MISSING_SESSION_MESSAGE
+                    )
+                }
+            }
+        }
     }
 
     /** Màn hình gọi sau khi đã điều hướng xong, để cờ không kích hoạt lại lần nữa. */

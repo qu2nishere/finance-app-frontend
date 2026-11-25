@@ -116,8 +116,33 @@ class AuthViewModelTest {
         assertNull(vm.state.value.errorMessage)
     }
 
+    @Test
+    fun completeOnboarding_whenSessionExists_transitionsToLoggedIn() = runTest {
+        fakeRepo.restoreOutcome = SessionResult.NoSession
+        val vm = AuthViewModel(fakeRepo)
+        fakeRepo.hasActiveSession = true
+
+        vm.completeOnboarding()
+
+        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertNull(vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun completeOnboarding_whenSessionMissing_staysLoggedOutWithMissingSessionMessage() = runTest {
+        fakeRepo.restoreOutcome = SessionResult.NoSession
+        val vm = AuthViewModel(fakeRepo)
+        fakeRepo.hasActiveSession = false
+
+        vm.completeOnboarding()
+
+        assertEquals(SessionStatus.LoggedOut, vm.state.value.session)
+        assertEquals(AuthViewModel.MISSING_SESSION_MESSAGE, vm.state.value.errorMessage)
+    }
+
     private class FakeAuthRepository : AuthRepository() {
         var restoreOutcome: SessionResult = SessionResult.NoSession
+        var hasActiveSession: Boolean = false
         var lastRememberMe: Boolean? = null
         var logoutCalled: Boolean = false
 
@@ -133,6 +158,8 @@ class AuthViewModelTest {
         }
 
         override suspend fun restoreSession(): SessionResult = restoreOutcome
+
+        override suspend fun hasSession(): Boolean = hasActiveSession
 
         override suspend fun login(
             email: String,

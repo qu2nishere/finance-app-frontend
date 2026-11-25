@@ -150,6 +150,15 @@ fun MainApp(
         }
     }
 
+    LaunchedEffect(auth.session, auth.errorMessage) {
+        if (auth.session == SessionStatus.LoggedOut &&
+            auth.errorMessage == AuthViewModel.MISSING_SESSION_MESSAGE &&
+            authScreen != AuthScreen.LOGIN
+        ) {
+            authScreen = AuthScreen.LOGIN
+        }
+    }
+
     fun push(route: Route) = backStack.add(route)
     fun openAddSheet(income: Boolean = false) {
         addSheetStartsWithIncome = income
