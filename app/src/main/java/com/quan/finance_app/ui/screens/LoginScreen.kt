@@ -42,13 +42,17 @@ fun LoginScreen(
     onGoogleLogin: (rememberMe: Boolean) -> Unit = {},
     onGoToRegister: () -> Unit = {},
     onForgotPassword: () -> Unit = {},
+    initialEmail: String = "quan@gmail.com",
+    infoMessage: String? = null,
     loading: Boolean = false,
     errorMessage: String? = null,
     fieldErrors: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
-    var email by remember { mutableStateOf("quan@gmail.com") }
-    var password by remember { mutableStateOf("matkhau123") }
+    var email by remember(initialEmail) { mutableStateOf(initialEmail) }
+    var password by remember(initialEmail, infoMessage) {
+        mutableStateOf(if (infoMessage != null) "" else "matkhau123")
+    }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(true) }
 
@@ -114,6 +118,16 @@ fun LoginScreen(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (infoMessage != null) {
+                MfInfoBanner(
+                    text = infoMessage,
+                    icon = Icons.Outlined.CheckCircle,
+                    background = MoneyFlowTheme.colors.surfaceInSoft,
+                    contentColor = MoneyFlowTheme.colors.flowInStrong,
+                    borderColor = MoneyFlowTheme.colors.flowInTrack
+                )
+            }
+
             AuthField(
                 label = "EMAIL",
                 value = email,

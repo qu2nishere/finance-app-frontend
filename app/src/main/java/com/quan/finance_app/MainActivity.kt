@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.ui.auth.AuthViewModel
+import com.quan.finance_app.ui.auth.PasswordResetStep
+import com.quan.finance_app.ui.auth.PasswordResetViewModel
 import com.quan.finance_app.ui.auth.SessionStatus
 import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
@@ -80,7 +82,20 @@ sealed interface Route {
 }
 
 /** Các màn trước khi đăng nhập, nằm ngoài khung tab. */
-enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER }
+enum class AuthScreen {
+    LOGIN,
+    FORGOT_PASSWORD,
+    RESET_CODE,
+    RESET_NEW_PASSWORD,
+    REGISTER,
+    VERIFY_EMAIL
+}
+
+private val PASSWORD_RESET_SCREENS = setOf(
+    AuthScreen.FORGOT_PASSWORD,
+    AuthScreen.RESET_CODE,
+    AuthScreen.RESET_NEW_PASSWORD
+)
 
 /** Hai bước thiết lập ban đầu sau đăng ký, hiển thị khi `LoggedIn && onboardingPending` (D11-B). */
 private enum class OnboardingStep { STEP_2, STEP_3 }
@@ -88,16 +103,20 @@ private enum class OnboardingStep { STEP_2, STEP_3 }
 @Composable
 fun MainApp(
     authViewModel: AuthViewModel = viewModel(),
+    passwordResetViewModel: PasswordResetViewModel = viewModel(),
     homeViewModel: HomeViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel(),
     budgetViewModel: BudgetViewModel = viewModel(),
     goalsViewModel: GoalsViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
+    val resetState by passwordResetViewModel.state.collectAsState()
     val goalsState by goalsViewModel.state.collectAsState()
     val context = LocalContext.current
 
     var authScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
+    var loginPrefillEmail by rememberSaveable { mutableStateOf<String?>(null) }
+    var loginInfoMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var onboardingStep by rememberSaveable { mutableStateOf(OnboardingStep.STEP_2) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val backStack = remember { mutableStateListOf<Route>() }
@@ -164,6 +183,27 @@ fun MainApp(
         }
     }
 
+    LaunchedEffect(resetState.step, authScreen) {
+        if (authScreen in PASSWORD_RESET_SCREENS) {
+            authScreen = when (resetState.step) {
+                PasswordResetStep.EMAIL -> AuthScreen.FORGOT_PASSWORD
+                PasswordResetStep.CODE -> AuthScreen.RESET_CODE
+                PasswordResetStep.NEW_PASSWORD -> AuthScreen.RESET_NEW_PASSWORD
+            }
+        }
+    }
+
+    LaunchedEffect(resetState.done) {
+        if (resetState.done) {
+            loginPrefillEmail = resetState.completedEmail
+            loginInfoMessage = PasswordResetViewModel.RESET_SUCCESS_MESSAGE
+            authViewModel.clearErrors()
+            passwordResetViewModel.consumeDone()
+            passwordResetViewModel.reset()
+            authScreen = AuthScreen.LOGIN
+        }
+    }
+
     fun push(route: Route) = backStack.add(route)
     fun openAddSheet(income: Boolean = false) {
         addSheetStartsWithIncome = income
@@ -179,22 +219,79 @@ fun MainApp(
     }
 
     if (auth.session == SessionStatus.LoggedOut) {
+        fun handlePasswordResetBack() {
+            if (!passwordResetViewModel.back()) {
+                authScreen = AuthScreen.LOGIN
+            }
+        }
+
         BackHandler(enabled = authScreen != AuthScreen.LOGIN) {
-            authScreen = AuthScreen.LOGIN
+            if (authScreen in PASSWORD_RESET_SCREENS) {
+                handlePasswordResetBack()
+            } else {
+                authViewModel.clearErrors()
+                authScreen = AuthScreen.LOGIN
+            }
         }
         when (authScreen) {
             AuthScreen.LOGIN -> LoginScreen(
                 onLogin = { email, password, rememberMe ->
+                    loginInfoMessage = null
                     authViewModel.login(email, password, rememberMe)
                 },
                 onGoogleLogin = { rememberMe ->
+                    loginInfoMessage = null
                     authViewModel.onGoogleSignInClicked(context, rememberMe = rememberMe)
                 },
-                onGoToRegister = { authViewModel.clearErrors(); authScreen = AuthScreen.REGISTER },
-                onForgotPassword = { authScreen = AuthScreen.VERIFY_EMAIL },
+                onGoToRegister = {
+                    loginInfoMessage = null
+                    authViewModel.clearErrors()
+                    authScreen = AuthScreen.REGISTER
+                },
+                onForgotPassword = {
+                    loginInfoMessage = null
+                    authViewModel.clearErrors()
+                    passwordResetViewModel.start()
+                    authScreen = AuthScreen.FORGOT_PASSWORD
+                },
+                initialEmail = loginPrefillEmail ?: "quan@gmail.com",
+                infoMessage = loginInfoMessage,
                 loading = auth.loading,
                 errorMessage = auth.errorMessage,
                 fieldErrors = auth.fieldErrors
+            )
+            AuthScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
+                email = resetState.email,
+                loading = resetState.loading,
+                errorMessage = resetState.errorMessage,
+                fieldErrors = resetState.fieldErrors,
+                onEmailChange = passwordResetViewModel::updateEmail,
+                onSendCode = { passwordResetViewModel.sendCode() },
+                onBack = { handlePasswordResetBack() }
+            )
+            AuthScreen.RESET_CODE -> ResetCodeScreen(
+                email = resetState.email,
+                code = resetState.code,
+                loading = resetState.loading,
+                resendSecondsLeft = resetState.resendSecondsLeft,
+                errorMessage = resetState.errorMessage,
+                infoMessage = resetState.infoMessage,
+                fieldErrors = resetState.fieldErrors,
+                onCodeChange = passwordResetViewModel::updateCode,
+                onVerifyCode = passwordResetViewModel::verifyCode,
+                onResendCode = passwordResetViewModel::resendCode,
+                onBack = { handlePasswordResetBack() },
+                onBackToLogin = {
+                    passwordResetViewModel.reset()
+                    authScreen = AuthScreen.LOGIN
+                }
+            )
+            AuthScreen.RESET_NEW_PASSWORD -> NewPasswordScreen(
+                loading = resetState.loading,
+                errorMessage = resetState.errorMessage,
+                fieldErrors = resetState.fieldErrors,
+                onSubmit = passwordResetViewModel::submitNewPassword,
+                onBack = { handlePasswordResetBack() }
             )
             AuthScreen.VERIFY_EMAIL -> VerifyEmailScreen(
                 onBack = { authScreen = AuthScreen.LOGIN },

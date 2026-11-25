@@ -5,11 +5,14 @@ import com.quan.finance_app.data.local.OnboardingStore
 import com.quan.finance_app.data.local.TokenStore
 import com.quan.finance_app.data.remote.AuthApi
 import com.quan.finance_app.data.remote.AuthResponseDto
+import com.quan.finance_app.data.remote.ForgotPasswordRequestDto
 import com.quan.finance_app.data.remote.GoogleLoginRequestDto
 import com.quan.finance_app.data.remote.LoginRequestDto
 import com.quan.finance_app.data.remote.ProblemDetailDto
 import com.quan.finance_app.data.remote.RefreshRequestDto
 import com.quan.finance_app.data.remote.RegisterRequestDto
+import com.quan.finance_app.data.remote.ResetPasswordRequestDto
+import com.quan.finance_app.data.remote.VerifyResetCodeRequestDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +39,16 @@ enum class SessionResult {
     Restored,
     Expired,
     Offline
+}
+
+/** Kết quả của 3 bước quên / đặt lại mật khẩu (D6, N6). */
+sealed interface PasswordResetResult {
+    data object Sent : PasswordResetResult
+    data object CodeAccepted : PasswordResetResult
+    data object Done : PasswordResetResult
+    data class FieldErrors(val errors: Map<String, String>) : PasswordResetResult
+    data class InvalidCode(val message: String) : PasswordResetResult
+    data class Failure(val message: String, val code: String? = null) : PasswordResetResult
 }
 
 open class AuthRepository(
@@ -102,6 +115,25 @@ open class AuthRepository(
     ): AuthResult = perform(rememberMe) {
         requireApi().loginWithGoogle(GoogleLoginRequestDto(idToken))
     }
+
+    open suspend fun requestPasswordReset(email: String): PasswordResetResult =
+        performPasswordReset(PasswordResetResult.Sent) {
+            requireApi().forgotPassword(ForgotPasswordRequestDto(email.trim()))
+        }
+
+    open suspend fun verifyResetCode(email: String, code: String): PasswordResetResult =
+        performPasswordReset(PasswordResetResult.CodeAccepted) {
+            requireApi().verifyResetCode(VerifyResetCodeRequestDto(email.trim(), code.trim()))
+        }
+
+    open suspend fun resetPassword(
+        email: String,
+        code: String,
+        newPassword: String
+    ): PasswordResetResult =
+        performPasswordReset(PasswordResetResult.Done) {
+            requireApi().resetPassword(ResetPasswordRequestDto(email.trim(), code.trim(), newPassword))
+        }
 
     /**
      * Đọc refresh token từ đĩa (Keystore) trên luồng IO và gọi `/api/auth/refresh` dưới cùng khoá
@@ -201,6 +233,46 @@ open class AuthRepository(
         if (!detail.isNullOrBlank()) return AuthResult.Failure(detail, problem.code)
 
         return AuthResult.Failure("Lỗi máy chủ (HTTP ${response.code()})", problem?.code)
+    }
+
+    private suspend fun performPasswordReset(
+        onSuccess: PasswordResetResult,
+        request: suspend () -> Response<Unit>
+    ): PasswordResetResult {
+        return try {
+            val response = request()
+            if (response.isSuccessful) {
+                onSuccess
+            } else {
+                toPasswordResetFailure(response)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: IOException) {
+            PasswordResetResult.Failure("Không kết nối được máy chủ.\nBackend đã chạy chưa? Địa chỉ trong ApiClient đúng chưa?")
+        } catch (e: Exception) {
+            PasswordResetResult.Failure(e.message ?: "Lỗi không xác định")
+        }
+    }
+
+    private fun toPasswordResetFailure(response: Response<Unit>): PasswordResetResult {
+        val problem = runCatching {
+            gson.fromJson(response.errorBody()?.string(), ProblemDetailDto::class.java)
+        }.getOrNull()
+
+        val errors = problem?.errors
+        if (!errors.isNullOrEmpty()) return PasswordResetResult.FieldErrors(errors)
+
+        if (problem?.code == "OTP_INVALID") {
+            return PasswordResetResult.InvalidCode(
+                problem.detail?.takeIf { it.isNotBlank() } ?: "Mã không đúng hoặc đã hết hạn"
+            )
+        }
+
+        val detail = problem?.detail
+        if (!detail.isNullOrBlank()) return PasswordResetResult.Failure(detail, problem.code)
+
+        return PasswordResetResult.Failure("Lỗi máy chủ (HTTP ${response.code()})", problem?.code)
     }
 
     private fun requireApi(): AuthApi =
