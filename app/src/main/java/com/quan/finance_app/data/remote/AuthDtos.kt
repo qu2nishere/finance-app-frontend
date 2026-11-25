@@ -24,6 +24,25 @@ data class GoogleLoginRequestDto(
     val idToken: String
 )
 
+data class RefreshRequestDto(
+    val refreshToken: String
+)
+
+data class ForgotPasswordRequestDto(
+    val email: String
+)
+
+data class VerifyResetCodeRequestDto(
+    val email: String,
+    val code: String
+)
+
+data class ResetPasswordRequestDto(
+    val email: String,
+    val code: String,
+    val newPassword: String
+)
+
 data class AuthResponseDto(
     val accessToken: String,
     val tokenType: String,

@@ -1,5 +1,6 @@
 package com.quan.finance_app.data.remote
 
+import com.quan.finance_app.BuildConfig
 import com.quan.finance_app.data.ServiceLocator
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -10,11 +11,24 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    // 8080 = qua Gateway Nginx (dieu huong toi ca user-service :8081 va ledger-service :8082)
+    // 8080 = qua Gateway Nginx (dieu huong toi user/ledger/budget/report-service)
     private const val BASE_URL = "http://10.0.2.2:8080/"
 
-    private val logging = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+    private fun createLogger(level: HttpLoggingInterceptor.Level): HttpLoggingInterceptor =
+        HttpLoggingInterceptor().apply {
+            this.level = level
+            redactHeader("Authorization")
+        }
+
+    private val bodyLogger = createLogger(HttpLoggingInterceptor.Level.BODY)
+    private val headerLogger = createLogger(HttpLoggingInterceptor.Level.HEADERS)
+
+    /** Không in body các endpoint xác thực ra Logcat vì chứa accessToken và refreshToken. */
+    private val safeLogging = Interceptor { chain ->
+        val path = chain.request().url.encodedPath
+        val isAuthEndpoint = path.startsWith("/api/auth") || path.startsWith("/api/v1/auth")
+        val delegate = if (isAuthEndpoint) headerLogger else bodyLogger
+        delegate.intercept(chain)
     }
 
     private val authInterceptor = Interceptor { chain ->
@@ -35,14 +49,43 @@ object ApiClient {
         chain.proceed(request)
     }
 
-    private val httpClient = OkHttpClient.Builder()
-        .addInterceptor(authInterceptor)
-        .addInterceptor(logging)
+    /** Client cơ sở không có authenticator — dùng riêng cho /refresh và /logout để tránh đệ quy. */
+    private val baseClient: OkHttpClient = OkHttpClient.Builder()
+        .apply {
+            if (BuildConfig.DEBUG) {
+                addInterceptor(safeLogging)
+            }
+        }
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    private val retrofit = Retrofit.Builder()
+    private val refreshRetrofit: Retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .client(baseClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    val refreshAuthApi: AuthApi = refreshRetrofit.create(AuthApi::class.java)
+
+    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
+        .apply {
+            if (BuildConfig.DEBUG) {
+                addInterceptor(safeLogging)
+            }
+        }
+        .authenticator(
+            TokenAuthenticator(
+                tokenStoreProvider = { ServiceLocator.tokenStore },
+                refreshApi = refreshAuthApi
+            )
+        )
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .build()
+
+    private val retrofit: Retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(httpClient)
         .addConverterFactory(GsonConverterFactory.create())

@@ -38,17 +38,21 @@ import com.quan.finance_app.ui.theme.*
  */
 @Composable
 fun LoginScreen(
-    onLogin: (email: String, password: String) -> Unit = { _, _ -> },
-    onGoogleLogin: () -> Unit = {},
+    onLogin: (email: String, password: String, rememberMe: Boolean) -> Unit = { _, _, _ -> },
+    onGoogleLogin: (rememberMe: Boolean) -> Unit = {},
     onGoToRegister: () -> Unit = {},
     onForgotPassword: () -> Unit = {},
+    initialEmail: String = "quan@gmail.com",
+    infoMessage: String? = null,
     loading: Boolean = false,
     errorMessage: String? = null,
     fieldErrors: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
-    var email by remember { mutableStateOf("quan@gmail.com") }
-    var password by remember { mutableStateOf("matkhau123") }
+    var email by remember(initialEmail) { mutableStateOf(initialEmail) }
+    var password by remember(initialEmail, infoMessage) {
+        mutableStateOf(if (infoMessage != null) "" else "matkhau123")
+    }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(true) }
 
@@ -114,6 +118,16 @@ fun LoginScreen(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (infoMessage != null) {
+                MfInfoBanner(
+                    text = infoMessage,
+                    icon = Icons.Outlined.CheckCircle,
+                    background = MoneyFlowTheme.colors.surfaceInSoft,
+                    contentColor = MoneyFlowTheme.colors.flowInStrong,
+                    borderColor = MoneyFlowTheme.colors.flowInTrack
+                )
+            }
+
             AuthField(
                 label = "EMAIL",
                 value = email,
@@ -175,7 +189,7 @@ fun LoginScreen(
 
             AuthPrimaryButton(
                 text = if (loading) "Đang đăng nhập…" else "Đăng nhập",
-                onClick = { if (!loading) onLogin(email, password) }
+                onClick = { if (!loading) onLogin(email, password, rememberMe) }
             )
 
             // Face ID
@@ -185,7 +199,7 @@ fun LoginScreen(
                     icon = Icons.Outlined.Face,
                     iconSize = 30.dp,
                     showChevron = true,
-                    onClick = { if (!loading) onLogin(email, password) }
+                    onClick = { if (!loading) onLogin(email, password, rememberMe) }
                 )
             }
 
@@ -213,13 +227,13 @@ fun LoginScreen(
                     label = "Google",
                     iconRes = com.quan.finance_app.R.drawable.ic_google,
                     modifier = Modifier.weight(1f),
-                    onClick = { if (!loading) onGoogleLogin() }
+                    onClick = { if (!loading) onGoogleLogin(rememberMe) }
                 )
                 SocialButton(
                     label = "Apple",
                     icon = Icons.Outlined.PhoneIphone,
                     modifier = Modifier.weight(1f),
-                    onClick = { if (!loading) onLogin(email, password) }
+                    onClick = { if (!loading) onLogin(email, password, rememberMe) }
                 )
             }
 

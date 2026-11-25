@@ -95,6 +95,18 @@ class ReportViewModel(
         }
     }
 
+    fun reset() {
+        allJob?.cancel()
+        trendJob?.cancel()
+        transactionsJob?.cancel()
+        val nowYm = currentYearMonthProvider()
+        _state.value = ReportUiState(
+            year = nowYm.year,
+            month = nowYm.monthValue,
+            canGoNext = false
+        )
+    }
+
     fun selectTab(tabIndex: Int) {
         _state.update { it.copy(selectedTab = tabIndex) }
     }

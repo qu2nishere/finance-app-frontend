@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.BarChart
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +31,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.ui.auth.AuthViewModel
+import com.quan.finance_app.ui.auth.PasswordResetStep
+import com.quan.finance_app.ui.auth.PasswordResetViewModel
+import com.quan.finance_app.ui.auth.SessionStatus
 import com.quan.finance_app.ui.screens.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 
@@ -76,37 +81,43 @@ sealed interface Route {
     data object AdjustBalance : Route
 }
 
-/** Hai man truoc khi dang nhap, nam ngoai khung tab. */
-enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
+/** Các màn trước khi đăng nhập, nằm ngoài khung tab. */
+enum class AuthScreen {
+    LOGIN,
+    FORGOT_PASSWORD,
+    RESET_CODE,
+    RESET_NEW_PASSWORD,
+    REGISTER,
+    VERIFY_EMAIL
+}
+
+private val PASSWORD_RESET_SCREENS = setOf(
+    AuthScreen.FORGOT_PASSWORD,
+    AuthScreen.RESET_CODE,
+    AuthScreen.RESET_NEW_PASSWORD
+)
+
+/** Hai bước thiết lập ban đầu sau đăng ký, hiển thị khi `LoggedIn && onboardingPending` (D11-B). */
+private enum class OnboardingStep { STEP_2, STEP_3 }
 
 @Composable
 fun MainApp(
     authViewModel: AuthViewModel = viewModel(),
+    passwordResetViewModel: PasswordResetViewModel = viewModel(),
     homeViewModel: HomeViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel(),
     budgetViewModel: BudgetViewModel = viewModel(),
     goalsViewModel: GoalsViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
+    val resetState by passwordResetViewModel.state.collectAsState()
     val goalsState by goalsViewModel.state.collectAsState()
     val context = LocalContext.current
 
-    var isLoggedIn by remember { mutableStateOf(false) }
     var authScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
-
-    // Gọi API xong thì mới điều hướng. consumeNavigation() tắt cờ để không chạy lại.
-    LaunchedEffect(auth.loginSuccess, auth.registerSuccess) {
-        when {
-            auth.loginSuccess -> {
-                isLoggedIn = true
-                authViewModel.consumeNavigation()
-                homeViewModel.loadData()
-                budgetViewModel.load()
-                goalsViewModel.load()
-            }
-            auth.registerSuccess -> { authScreen = AuthScreen.REGISTER_2; authViewModel.consumeNavigation() }
-        }
-    }
+    var loginPrefillEmail by rememberSaveable { mutableStateOf<String?>(null) }
+    var loginInfoMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var onboardingStep by rememberSaveable { mutableStateOf(OnboardingStep.STEP_2) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val backStack = remember { mutableStateListOf<Route>() }
 
@@ -122,6 +133,77 @@ fun MainApp(
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showDeleteData by remember { mutableStateOf(false) }
 
+    fun onSessionStarted() {
+        homeViewModel.loadData()
+        budgetViewModel.load()
+        goalsViewModel.load()
+        reportViewModel.refresh()
+    }
+
+    fun onSessionCleared() {
+        homeViewModel.reset()
+        reportViewModel.reset()
+        budgetViewModel.reset()
+        goalsViewModel.reset()
+        showAddSheet = false
+        showAutoSaveOverAdd = false
+        showScanReceipt = false
+        goalDepositTarget = null
+        showCategoryPicker = false
+        showDeleteData = false
+        backStack.clear()
+        selectedTab = 0
+        onboardingStep = OnboardingStep.STEP_2
+        authScreen = AuthScreen.LOGIN
+    }
+
+    LaunchedEffect(auth.session, auth.onboardingPending) {
+        when {
+            auth.session == SessionStatus.LoggedIn && !auth.onboardingPending -> onSessionStarted()
+            auth.session == SessionStatus.LoggedOut -> onSessionCleared()
+        }
+    }
+
+    LaunchedEffect(auth.loginSuccess, auth.registerSuccess) {
+        when {
+            auth.loginSuccess -> authViewModel.consumeNavigation()
+            auth.registerSuccess -> {
+                onboardingStep = OnboardingStep.STEP_2
+                authViewModel.consumeNavigation()
+            }
+        }
+    }
+
+    LaunchedEffect(auth.session, auth.errorMessage) {
+        if (auth.session == SessionStatus.LoggedOut &&
+            auth.errorMessage == AuthViewModel.MISSING_SESSION_MESSAGE &&
+            authScreen != AuthScreen.LOGIN
+        ) {
+            authScreen = AuthScreen.LOGIN
+        }
+    }
+
+    LaunchedEffect(resetState.step, authScreen) {
+        if (authScreen in PASSWORD_RESET_SCREENS) {
+            authScreen = when (resetState.step) {
+                PasswordResetStep.EMAIL -> AuthScreen.FORGOT_PASSWORD
+                PasswordResetStep.CODE -> AuthScreen.RESET_CODE
+                PasswordResetStep.NEW_PASSWORD -> AuthScreen.RESET_NEW_PASSWORD
+            }
+        }
+    }
+
+    LaunchedEffect(resetState.done) {
+        if (resetState.done) {
+            loginPrefillEmail = resetState.completedEmail
+            loginInfoMessage = PasswordResetViewModel.RESET_SUCCESS_MESSAGE
+            authViewModel.clearErrors()
+            passwordResetViewModel.consumeDone()
+            passwordResetViewModel.reset()
+            authScreen = AuthScreen.LOGIN
+        }
+    }
+
     fun push(route: Route) = backStack.add(route)
     fun openAddSheet(income: Boolean = false) {
         addSheetStartsWithIncome = income
@@ -131,48 +213,120 @@ fun MainApp(
         if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
     }
 
-    if (!isLoggedIn) {
+    if (auth.session == SessionStatus.Checking) {
+        SessionCheckingScreen()
+        return
+    }
+
+    if (auth.session == SessionStatus.LoggedOut) {
+        fun handlePasswordResetBack() {
+            if (!passwordResetViewModel.back()) {
+                authScreen = AuthScreen.LOGIN
+            }
+        }
+
         BackHandler(enabled = authScreen != AuthScreen.LOGIN) {
-            authScreen = when (authScreen) {
-                AuthScreen.REGISTER_3 -> AuthScreen.REGISTER_2
-                AuthScreen.REGISTER_2 -> AuthScreen.REGISTER
-                else -> AuthScreen.LOGIN
+            if (authScreen in PASSWORD_RESET_SCREENS) {
+                handlePasswordResetBack()
+            } else {
+                authViewModel.clearErrors()
+                authScreen = AuthScreen.LOGIN
             }
         }
         when (authScreen) {
             AuthScreen.LOGIN -> LoginScreen(
-                onLogin = { email, password -> authViewModel.login(email, password) },
-                onGoogleLogin = { authViewModel.onGoogleSignInClicked(context) },
-                onGoToRegister = { authViewModel.clearErrors(); authScreen = AuthScreen.REGISTER },
-                onForgotPassword = { authScreen = AuthScreen.VERIFY_EMAIL },
+                onLogin = { email, password, rememberMe ->
+                    loginInfoMessage = null
+                    authViewModel.login(email, password, rememberMe)
+                },
+                onGoogleLogin = { rememberMe ->
+                    loginInfoMessage = null
+                    authViewModel.onGoogleSignInClicked(context, rememberMe = rememberMe)
+                },
+                onGoToRegister = {
+                    loginInfoMessage = null
+                    authViewModel.clearErrors()
+                    authScreen = AuthScreen.REGISTER
+                },
+                onForgotPassword = {
+                    loginInfoMessage = null
+                    authViewModel.clearErrors()
+                    passwordResetViewModel.start()
+                    authScreen = AuthScreen.FORGOT_PASSWORD
+                },
+                initialEmail = loginPrefillEmail ?: "quan@gmail.com",
+                infoMessage = loginInfoMessage,
                 loading = auth.loading,
                 errorMessage = auth.errorMessage,
                 fieldErrors = auth.fieldErrors
             )
+            AuthScreen.FORGOT_PASSWORD -> ForgotPasswordScreen(
+                email = resetState.email,
+                loading = resetState.loading,
+                errorMessage = resetState.errorMessage,
+                fieldErrors = resetState.fieldErrors,
+                onEmailChange = passwordResetViewModel::updateEmail,
+                onSendCode = { passwordResetViewModel.sendCode() },
+                onBack = { handlePasswordResetBack() }
+            )
+            AuthScreen.RESET_CODE -> ResetCodeScreen(
+                email = resetState.email,
+                code = resetState.code,
+                loading = resetState.loading,
+                resendSecondsLeft = resetState.resendSecondsLeft,
+                errorMessage = resetState.errorMessage,
+                infoMessage = resetState.infoMessage,
+                fieldErrors = resetState.fieldErrors,
+                onCodeChange = passwordResetViewModel::updateCode,
+                onVerifyCode = passwordResetViewModel::verifyCode,
+                onResendCode = passwordResetViewModel::resendCode,
+                onBack = { handlePasswordResetBack() },
+                onBackToLogin = {
+                    passwordResetViewModel.reset()
+                    authScreen = AuthScreen.LOGIN
+                }
+            )
+            AuthScreen.RESET_NEW_PASSWORD -> NewPasswordScreen(
+                loading = resetState.loading,
+                errorMessage = resetState.errorMessage,
+                fieldErrors = resetState.fieldErrors,
+                onSubmit = passwordResetViewModel::submitNewPassword,
+                onBack = { handlePasswordResetBack() }
+            )
             AuthScreen.VERIFY_EMAIL -> VerifyEmailScreen(
                 onBack = { authScreen = AuthScreen.LOGIN },
-                onVerified = { isLoggedIn = true }
+                onVerified = { authViewModel.completeOnboarding() }
             )
             AuthScreen.REGISTER -> RegisterScreen(
                 onBack = { authViewModel.clearErrors(); authScreen = AuthScreen.LOGIN },
                 onContinue = { fullName, email, password ->
                     authViewModel.register(email, password, fullName)
                 },
-                onGoogleLogin = { authViewModel.onGoogleSignInClicked(context) },
+                onGoogleLogin = { authViewModel.onGoogleSignInClicked(context, rememberMe = true) },
                 onGoToLogin = { authViewModel.clearErrors(); authScreen = AuthScreen.LOGIN },
                 loading = auth.loading,
                 errorMessage = auth.errorMessage,
                 fieldErrors = auth.fieldErrors
             )
-            AuthScreen.REGISTER_2 -> RegisterStep2Screen(
-                onBack = { authScreen = AuthScreen.REGISTER },
-                onContinue = { authScreen = AuthScreen.REGISTER_3 },
-                onSkip = { isLoggedIn = true }
+        }
+        return
+    }
+
+    if (auth.onboardingPending) {
+        // Ở bước 2 không lùi về màn Đăng ký vì tài khoản đã được tạo
+        BackHandler(enabled = onboardingStep == OnboardingStep.STEP_3) {
+            onboardingStep = OnboardingStep.STEP_2
+        }
+        when (onboardingStep) {
+            OnboardingStep.STEP_2 -> RegisterStep2Screen(
+                onBack = { },
+                onContinue = { onboardingStep = OnboardingStep.STEP_3 },
+                onSkip = { authViewModel.completeOnboarding() }
             )
-            AuthScreen.REGISTER_3 -> RegisterStep3Screen(
-                onBack = { authScreen = AuthScreen.REGISTER_2 },
-                onFinish = { isLoggedIn = true },
-                onSkip = { isLoggedIn = true }
+            OnboardingStep.STEP_3 -> RegisterStep3Screen(
+                onBack = { onboardingStep = OnboardingStep.STEP_2 },
+                onFinish = { authViewModel.completeOnboarding() },
+                onSkip = { authViewModel.completeOnboarding() }
             )
         }
         return
@@ -324,15 +478,7 @@ fun MainApp(
                         Route.Account -> AccountScreen(
                             onBack = { pop() },
                             onOpenSecurity = { push(Route.Security) },
-                            onLogout = {
-                                authViewModel.logout()
-                                budgetViewModel.reset()
-                                goalsViewModel.reset()
-                                backStack.clear()
-                                selectedTab = 0
-                                authScreen = AuthScreen.LOGIN
-                                isLoggedIn = false
-                            }
+                            onLogout = { authViewModel.logout() }
                         )
                     }
                 }
@@ -564,5 +710,47 @@ fun NavItem(
             ),
             color = color
         )
+    }
+}
+
+@Composable
+private fun SessionCheckingScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MoneyFlowTheme.colors.surfacePage)
+            .systemBarsPadding(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(MoneyFlowTheme.spacing.space4)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(MoneyFlowTheme.colors.surfaceBrandSoft, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                    contentDescription = null,
+                    tint = MoneyFlowTheme.colors.textBrand,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Text(
+                text = "Money Flow",
+                style = MoneyFlowTheme.typography.title2,
+                color = MoneyFlowTheme.colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(MoneyFlowTheme.spacing.space2))
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                color = MoneyFlowTheme.colors.surfaceBrand,
+                trackColor = MoneyFlowTheme.colors.borderSubtle,
+                strokeWidth = 2.5.dp
+            )
+        }
     }
 }
