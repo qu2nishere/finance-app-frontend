@@ -44,6 +44,7 @@ class AuthViewModelTest {
         val vm = AuthViewModel(fakeRepo)
 
         assertEquals(SessionStatus.LoggedOut, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
         assertNull(vm.state.value.errorMessage)
     }
 
@@ -54,7 +55,20 @@ class AuthViewModelTest {
         val vm = AuthViewModel(fakeRepo)
 
         assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
         assertNull(vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun init_whenRestoredWithPendingOnboarding_setsOnboardingPendingTrue() = runTest {
+        fakeRepo.currentUserId = "user-pending"
+        fakeRepo.pendingUserIds.add("user-pending")
+        fakeRepo.restoreOutcome = SessionResult.Restored
+
+        val vm = AuthViewModel(fakeRepo)
+
+        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertTrue(vm.state.value.onboardingPending)
     }
 
     @Test
@@ -68,12 +82,15 @@ class AuthViewModelTest {
     }
 
     @Test
-    fun init_whenOffline_transitionsToLoggedIn() = runTest {
+    fun init_whenOffline_transitionsToLoggedInAndPreservesPendingOnboarding() = runTest {
+        fakeRepo.currentUserId = "user-offline"
+        fakeRepo.pendingUserIds.add("user-offline")
         fakeRepo.restoreOutcome = SessionResult.Offline
 
         val vm = AuthViewModel(fakeRepo)
 
         assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertTrue(vm.state.value.onboardingPending)
         assertNull(vm.state.value.errorMessage)
     }
 
@@ -86,8 +103,75 @@ class AuthViewModelTest {
 
         assertEquals(false, fakeRepo.lastRememberMe)
         assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
         assertTrue(vm.state.value.loginSuccess)
         assertEquals("Nguyễn Minh", vm.state.value.displayName)
+    }
+
+    @Test
+    fun register_marksUserLoggedInWithOnboardingPending() = runTest {
+        fakeRepo.restoreOutcome = SessionResult.NoSession
+        val vm = AuthViewModel(fakeRepo)
+
+        vm.register("new@gmail.com", "matkhau123", "Người mới")
+
+        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertTrue(vm.state.value.onboardingPending)
+        assertTrue(vm.state.value.registerSuccess)
+    }
+
+    @Test
+    fun completeOnboarding_whenSessionExists_clearsPendingFlagAndEntersApp() = runTest {
+        fakeRepo.restoreOutcome = SessionResult.NoSession
+        val vm = AuthViewModel(fakeRepo)
+        vm.register("new@gmail.com", "matkhau123", "Người mới")
+        assertTrue(vm.state.value.onboardingPending)
+
+        vm.completeOnboarding()
+
+        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
+        assertFalse(fakeRepo.pendingUserIds.contains("user-new@gmail.com"))
+        assertNull(vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun completeOnboarding_whenSessionMissing_returnsToLoggedOutWithMissingSessionMessage() = runTest {
+        fakeRepo.restoreOutcome = SessionResult.NoSession
+        val vm = AuthViewModel(fakeRepo)
+        fakeRepo.hasActiveSession = false
+
+        vm.completeOnboarding()
+
+        assertEquals(SessionStatus.LoggedOut, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
+        assertEquals(AuthViewModel.MISSING_SESSION_MESSAGE, vm.state.value.errorMessage)
+    }
+
+    @Test
+    fun onboardingPending_keptAcrossLogoutForSameUser_notShownForAnotherUser() = runTest {
+        fakeRepo.restoreOutcome = SessionResult.NoSession
+        val vm = AuthViewModel(fakeRepo)
+
+        vm.register("userA@gmail.com", "matkhau123", "User A")
+        assertTrue(vm.state.value.onboardingPending)
+
+        // Đăng xuất khi chưa xong bước 2–3 -> cờ vẫn nằm trong OnboardingStore
+        vm.logout()
+        assertEquals(SessionStatus.LoggedOut, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
+
+        // User B đăng nhập trên cùng máy -> không thấy onboarding của User A
+        vm.login("userB@gmail.com", "matkhau123")
+        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertFalse(vm.state.value.onboardingPending)
+
+        vm.logout()
+
+        // User A đăng nhập lại -> vẫn tiếp tục onboarding đang dở
+        vm.login("userA@gmail.com", "matkhau123")
+        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
+        assertTrue(vm.state.value.onboardingPending)
     }
 
     @Test
@@ -116,33 +200,11 @@ class AuthViewModelTest {
         assertNull(vm.state.value.errorMessage)
     }
 
-    @Test
-    fun completeOnboarding_whenSessionExists_transitionsToLoggedIn() = runTest {
-        fakeRepo.restoreOutcome = SessionResult.NoSession
-        val vm = AuthViewModel(fakeRepo)
-        fakeRepo.hasActiveSession = true
-
-        vm.completeOnboarding()
-
-        assertEquals(SessionStatus.LoggedIn, vm.state.value.session)
-        assertNull(vm.state.value.errorMessage)
-    }
-
-    @Test
-    fun completeOnboarding_whenSessionMissing_staysLoggedOutWithMissingSessionMessage() = runTest {
-        fakeRepo.restoreOutcome = SessionResult.NoSession
-        val vm = AuthViewModel(fakeRepo)
-        fakeRepo.hasActiveSession = false
-
-        vm.completeOnboarding()
-
-        assertEquals(SessionStatus.LoggedOut, vm.state.value.session)
-        assertEquals(AuthViewModel.MISSING_SESSION_MESSAGE, vm.state.value.errorMessage)
-    }
-
     private class FakeAuthRepository : AuthRepository() {
         var restoreOutcome: SessionResult = SessionResult.NoSession
         var hasActiveSession: Boolean = false
+        var currentUserId: String? = null
+        val pendingUserIds = mutableSetOf<String>()
         var lastRememberMe: Boolean? = null
         var logoutCalled: Boolean = false
 
@@ -154,12 +216,49 @@ class AuthViewModelTest {
         }
 
         fun emitSessionExpired() {
+            hasActiveSession = false
+            currentUserId = null
             expiredState.value = true
         }
 
-        override suspend fun restoreSession(): SessionResult = restoreOutcome
+        override suspend fun restoreSession(): SessionResult {
+            if (restoreOutcome == SessionResult.Restored || restoreOutcome == SessionResult.Offline) {
+                hasActiveSession = true
+            }
+            return restoreOutcome
+        }
 
         override suspend fun hasSession(): Boolean = hasActiveSession
+
+        override suspend fun isOnboardingPending(): Boolean =
+            currentUserId != null && currentUserId in pendingUserIds
+
+        override suspend fun finishOnboarding() {
+            currentUserId?.let { pendingUserIds.remove(it) }
+        }
+
+        override suspend fun register(
+            email: String,
+            password: String,
+            fullName: String,
+            rememberMe: Boolean
+        ): AuthResult {
+            val uid = "user-$email"
+            currentUserId = uid
+            hasActiveSession = true
+            pendingUserIds.add(uid)
+            return AuthResult.Success(
+                AuthResponseDto(
+                    accessToken = "access-reg",
+                    refreshToken = "refresh-reg",
+                    tokenType = "Bearer",
+                    expiresIn = 900L,
+                    userId = uid,
+                    email = email,
+                    fullName = fullName
+                )
+            )
+        }
 
         override suspend fun login(
             email: String,
@@ -167,13 +266,16 @@ class AuthViewModelTest {
             rememberMe: Boolean
         ): AuthResult {
             lastRememberMe = rememberMe
+            val uid = "user-$email"
+            currentUserId = uid
+            hasActiveSession = true
             return AuthResult.Success(
                 AuthResponseDto(
                     accessToken = "access-1",
                     refreshToken = "refresh-1",
                     tokenType = "Bearer",
                     expiresIn = 900L,
-                    userId = "user-1",
+                    userId = uid,
                     email = email,
                     fullName = "Nguyễn Minh"
                 )
@@ -182,6 +284,8 @@ class AuthViewModelTest {
 
         override suspend fun logout() {
             logoutCalled = true
+            hasActiveSession = false
+            currentUserId = null
         }
     }
 }

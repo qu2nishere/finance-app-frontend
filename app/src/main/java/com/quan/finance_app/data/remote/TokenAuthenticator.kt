@@ -63,7 +63,8 @@ class TokenAuthenticator(
                 tokenStore.save(
                     access = body.accessToken,
                     refresh = body.refreshToken ?: refresh,
-                    persist = tokenStore.isPersisted
+                    persist = tokenStore.isPersisted,
+                    userId = body.userId
                 )
                 return response.request.withBearer(body.accessToken)
             }

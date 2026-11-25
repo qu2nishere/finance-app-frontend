@@ -29,6 +29,9 @@ class TokenStore(
     private var ramRefreshToken: String? = null
 
     @Volatile
+    private var ramUserId: String? = null
+
+    @Volatile
     var isPersisted: Boolean = false
         private set
 
@@ -62,9 +65,18 @@ class TokenStore(
     val isLoggedIn: Boolean
         get() = accessToken != null || refreshToken != null
 
-    fun save(access: String, refresh: String?, persist: Boolean = true) {
+    val userId: String?
+        get() = ramUserId ?: prefs.getString(KEY_USER_ID, null)?.also { ramUserId = it }
+
+    fun save(
+        access: String,
+        refresh: String?,
+        persist: Boolean = true,
+        userId: String? = this.userId
+    ) {
         accessToken = access
         ramRefreshToken = refresh
+        ramUserId = userId
         isPersisted = persist && refresh != null
         _sessionExpired.value = false
 
@@ -77,12 +89,19 @@ class TokenStore(
             }
             if (encrypted != null) {
                 editor.putString(KEY_REFRESH_ENC, encrypted)
+                if (!userId.isNullOrBlank()) {
+                    editor.putString(KEY_USER_ID, userId)
+                } else {
+                    editor.remove(KEY_USER_ID)
+                }
             } else {
                 isPersisted = false
                 editor.remove(KEY_REFRESH_ENC)
+                editor.remove(KEY_USER_ID)
             }
         } else {
             editor.remove(KEY_REFRESH_ENC)
+            editor.remove(KEY_USER_ID)
         }
         editor.apply()
     }
@@ -90,6 +109,7 @@ class TokenStore(
     fun clear() {
         accessToken = null
         ramRefreshToken = null
+        ramUserId = null
         isPersisted = false
         prefs.edit().clear().apply()
     }
@@ -107,5 +127,6 @@ class TokenStore(
         const val PREFS = "auth_prefs"
         const val KEY_LEGACY_REFRESH = "refresh_token"
         const val KEY_REFRESH_ENC = "refresh_token_enc"
+        const val KEY_USER_ID = "user_id"
     }
 }

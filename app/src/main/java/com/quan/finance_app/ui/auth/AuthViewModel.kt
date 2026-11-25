@@ -35,6 +35,7 @@ enum class SessionStatus {
  */
 data class AuthUiState(
     val session: SessionStatus = SessionStatus.Checking,
+    val onboardingPending: Boolean = false,
     val loading: Boolean = false,
     val errorMessage: String? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
@@ -66,19 +67,40 @@ class AuthViewModel(
         viewModelScope.launch {
             when (repository.restoreSession()) {
                 SessionResult.Restored -> {
-                    _state.update { it.copy(session = SessionStatus.LoggedIn, errorMessage = null) }
+                    val pending = repository.isOnboardingPending()
+                    _state.update {
+                        it.copy(
+                            session = SessionStatus.LoggedIn,
+                            onboardingPending = pending,
+                            errorMessage = null
+                        )
+                    }
                 }
                 SessionResult.Offline -> {
-                    // D3-B: mất mạng không phải hết hạn phiên -> vẫn vào Home, giữ refresh token
-                    _state.update { it.copy(session = SessionStatus.LoggedIn, errorMessage = null) }
+                    // D3-B: mất mạng không phải hết hạn phiên -> vẫn vào Home (hoặc onboarding nếu đang dở), giữ refresh token
+                    val pending = repository.isOnboardingPending()
+                    _state.update {
+                        it.copy(
+                            session = SessionStatus.LoggedIn,
+                            onboardingPending = pending,
+                            errorMessage = null
+                        )
+                    }
                 }
                 SessionResult.NoSession -> {
-                    _state.update { it.copy(session = SessionStatus.LoggedOut, errorMessage = null) }
+                    _state.update {
+                        it.copy(
+                            session = SessionStatus.LoggedOut,
+                            onboardingPending = false,
+                            errorMessage = null
+                        )
+                    }
                 }
                 SessionResult.Expired -> {
                     _state.update {
                         it.copy(
                             session = SessionStatus.LoggedOut,
+                            onboardingPending = false,
                             errorMessage = SESSION_EXPIRED_MESSAGE
                         )
                     }
@@ -175,9 +197,11 @@ class AuthViewModel(
     fun completeOnboarding() {
         viewModelScope.launch {
             if (repository.hasSession()) {
+                repository.finishOnboarding()
                 _state.update {
                     it.copy(
                         session = SessionStatus.LoggedIn,
+                        onboardingPending = false,
                         registerSuccess = false,
                         errorMessage = null
                     )
@@ -186,6 +210,7 @@ class AuthViewModel(
                 _state.update {
                     it.copy(
                         session = SessionStatus.LoggedOut,
+                        onboardingPending = false,
                         registerSuccess = false,
                         errorMessage = MISSING_SESSION_MESSAGE
                     )
@@ -216,15 +241,18 @@ class AuthViewModel(
 
         viewModelScope.launch {
             when (val result = block()) {
-                is AuthResult.Success -> _state.update {
-                    val isDirectLogin = action == "login"
-                    it.copy(
-                        session = if (isDirectLogin) SessionStatus.LoggedIn else it.session,
-                        loading = false,
-                        displayName = result.data.fullName,
-                        loginSuccess = isDirectLogin,
-                        registerSuccess = action == "register"
-                    )
+                is AuthResult.Success -> {
+                    val pending = repository.isOnboardingPending()
+                    _state.update {
+                        it.copy(
+                            session = SessionStatus.LoggedIn,
+                            onboardingPending = pending,
+                            loading = false,
+                            displayName = result.data.fullName,
+                            loginSuccess = action == "login",
+                            registerSuccess = action == "register"
+                        )
+                    }
                 }
                 is AuthResult.FieldErrors -> _state.update {
                     it.copy(loading = false, fieldErrors = result.errors)

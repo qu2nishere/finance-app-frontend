@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,8 +79,11 @@ sealed interface Route {
     data object AdjustBalance : Route
 }
 
-/** Hai man truoc khi dang nhap, nam ngoai khung tab. */
-enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER, REGISTER_2, REGISTER_3 }
+/** Các màn trước khi đăng nhập, nằm ngoài khung tab. */
+enum class AuthScreen { LOGIN, VERIFY_EMAIL, REGISTER }
+
+/** Hai bước thiết lập ban đầu sau đăng ký, hiển thị khi `LoggedIn && onboardingPending` (D11-B). */
+private enum class OnboardingStep { STEP_2, STEP_3 }
 
 @Composable
 fun MainApp(
@@ -94,6 +98,7 @@ fun MainApp(
     val context = LocalContext.current
 
     var authScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
+    var onboardingStep by rememberSaveable { mutableStateOf(OnboardingStep.STEP_2) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val backStack = remember { mutableStateListOf<Route>() }
 
@@ -129,14 +134,14 @@ fun MainApp(
         showDeleteData = false
         backStack.clear()
         selectedTab = 0
+        onboardingStep = OnboardingStep.STEP_2
         authScreen = AuthScreen.LOGIN
     }
 
-    LaunchedEffect(auth.session) {
-        when (auth.session) {
-            SessionStatus.LoggedIn -> onSessionStarted()
-            SessionStatus.LoggedOut -> onSessionCleared()
-            SessionStatus.Checking -> Unit
+    LaunchedEffect(auth.session, auth.onboardingPending) {
+        when {
+            auth.session == SessionStatus.LoggedIn && !auth.onboardingPending -> onSessionStarted()
+            auth.session == SessionStatus.LoggedOut -> onSessionCleared()
         }
     }
 
@@ -144,7 +149,7 @@ fun MainApp(
         when {
             auth.loginSuccess -> authViewModel.consumeNavigation()
             auth.registerSuccess -> {
-                authScreen = AuthScreen.REGISTER_2
+                onboardingStep = OnboardingStep.STEP_2
                 authViewModel.consumeNavigation()
             }
         }
@@ -175,11 +180,7 @@ fun MainApp(
 
     if (auth.session == SessionStatus.LoggedOut) {
         BackHandler(enabled = authScreen != AuthScreen.LOGIN) {
-            authScreen = when (authScreen) {
-                AuthScreen.REGISTER_3 -> AuthScreen.REGISTER_2
-                AuthScreen.REGISTER_2 -> AuthScreen.REGISTER
-                else -> AuthScreen.LOGIN
-            }
+            authScreen = AuthScreen.LOGIN
         }
         when (authScreen) {
             AuthScreen.LOGIN -> LoginScreen(
@@ -210,13 +211,23 @@ fun MainApp(
                 errorMessage = auth.errorMessage,
                 fieldErrors = auth.fieldErrors
             )
-            AuthScreen.REGISTER_2 -> RegisterStep2Screen(
-                onBack = { authScreen = AuthScreen.REGISTER },
-                onContinue = { authScreen = AuthScreen.REGISTER_3 },
+        }
+        return
+    }
+
+    if (auth.onboardingPending) {
+        // Ở bước 2 không lùi về màn Đăng ký vì tài khoản đã được tạo
+        BackHandler(enabled = onboardingStep == OnboardingStep.STEP_3) {
+            onboardingStep = OnboardingStep.STEP_2
+        }
+        when (onboardingStep) {
+            OnboardingStep.STEP_2 -> RegisterStep2Screen(
+                onBack = { },
+                onContinue = { onboardingStep = OnboardingStep.STEP_3 },
                 onSkip = { authViewModel.completeOnboarding() }
             )
-            AuthScreen.REGISTER_3 -> RegisterStep3Screen(
-                onBack = { authScreen = AuthScreen.REGISTER_2 },
+            OnboardingStep.STEP_3 -> RegisterStep3Screen(
+                onBack = { onboardingStep = OnboardingStep.STEP_2 },
                 onFinish = { authViewModel.completeOnboarding() },
                 onSkip = { authViewModel.completeOnboarding() }
             )

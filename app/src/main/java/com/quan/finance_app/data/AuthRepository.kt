@@ -1,6 +1,7 @@
 package com.quan.finance_app.data
 
 import com.google.gson.Gson
+import com.quan.finance_app.data.local.OnboardingStore
 import com.quan.finance_app.data.local.TokenStore
 import com.quan.finance_app.data.remote.AuthApi
 import com.quan.finance_app.data.remote.AuthResponseDto
@@ -40,7 +41,8 @@ enum class SessionResult {
 open class AuthRepository(
     private val api: AuthApi? = null,
     private val refreshApi: AuthApi? = api,
-    private val tokenStore: TokenStore? = null
+    private val tokenStore: TokenStore? = null,
+    private val onboardingStore: OnboardingStore? = null
 ) {
     private val gson = Gson()
     private val fallbackSessionExpired = MutableStateFlow(false)
@@ -57,13 +59,33 @@ open class AuthRepository(
         requireTokenStore().isLoggedIn
     }
 
+    /** Kiểm tra người dùng hiện tại còn đang dở bước thiết lập ban đầu (bước 2–3) hay không (D3). */
+    open suspend fun isOnboardingPending(): Boolean = withContext(Dispatchers.IO) {
+        val uid = requireTokenStore().userId
+        requireOnboardingStore().isPending(uid)
+    }
+
+    /** Xoá cờ onboarding của người dùng hiện tại sau khi hoàn tất hoặc bỏ qua bước 2–3. */
+    open suspend fun finishOnboarding() = withContext(Dispatchers.IO) {
+        val uid = requireTokenStore().userId
+        requireOnboardingStore().clear(uid)
+    }
+
     open suspend fun register(
         email: String,
         password: String,
         fullName: String,
         rememberMe: Boolean = true
-    ): AuthResult = perform(rememberMe) {
-        requireApi().register(RegisterRequestDto(email.trim(), password, fullName.trim()))
+    ): AuthResult {
+        val result = perform(rememberMe) {
+            requireApi().register(RegisterRequestDto(email.trim(), password, fullName.trim()))
+        }
+        if (result is AuthResult.Success) {
+            withContext(Dispatchers.IO) {
+                requireOnboardingStore().markPending(result.data.userId)
+            }
+        }
+        return result
     }
 
     open suspend fun login(
@@ -104,7 +126,8 @@ open class AuthRepository(
                 store.save(
                     access = body.accessToken,
                     refresh = body.refreshToken ?: refresh,
-                    persist = store.isPersisted
+                    persist = store.isPersisted,
+                    userId = body.userId
                 )
                 return@withContext SessionResult.Restored
             }
@@ -149,7 +172,8 @@ open class AuthRepository(
                     requireTokenStore().save(
                         access = body.accessToken,
                         refresh = body.refreshToken,
-                        persist = rememberMe
+                        persist = rememberMe,
+                        userId = body.userId
                     )
                 }
                 AuthResult.Success(body)
@@ -187,4 +211,7 @@ open class AuthRepository(
 
     private fun requireTokenStore(): TokenStore =
         requireNotNull(tokenStore) { "TokenStore chưa được khởi tạo" }
+
+    private fun requireOnboardingStore(): OnboardingStore =
+        requireNotNull(onboardingStore) { "OnboardingStore chưa được khởi tạo" }
 }
