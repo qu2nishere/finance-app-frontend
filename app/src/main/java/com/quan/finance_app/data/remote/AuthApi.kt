@@ -1,5 +1,6 @@
 package com.quan.finance_app.data.remote
 
+import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -20,4 +21,14 @@ interface AuthApi {
 
     @POST("api/v1/auth/google")
     suspend fun loginWithGoogle(@Body body: GoogleLoginRequestDto): Response<AuthResponseDto>
+
+    @POST("api/auth/refresh")
+    suspend fun refresh(@Body body: RefreshRequestDto): Response<AuthResponseDto>
+
+    /** Ban dong bo cho OkHttp Authenticator va restoreSession tren luong IO co khoa dong bo. */
+    @POST("api/auth/refresh")
+    fun refreshCall(@Body body: RefreshRequestDto): Call<AuthResponseDto>
+
+    @POST("api/auth/logout")
+    suspend fun logout(@Body body: RefreshRequestDto): Response<Unit>
 }

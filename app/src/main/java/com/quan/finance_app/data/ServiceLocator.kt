@@ -1,6 +1,7 @@
 package com.quan.finance_app.data
 
 import android.content.Context
+import com.quan.finance_app.data.local.TokenCipher
 import com.quan.finance_app.data.local.TokenStore
 import com.quan.finance_app.data.remote.ApiClient
 
@@ -25,8 +26,13 @@ object ServiceLocator {
         private set
 
     fun init(context: Context) {
-        tokenStore = TokenStore(context.applicationContext)
-        authRepository = AuthRepository(ApiClient.authApi, tokenStore)
+        val tokenCipher = TokenCipher()
+        tokenStore = TokenStore(context.applicationContext, tokenCipher)
+        authRepository = AuthRepository(
+            api = ApiClient.authApi,
+            refreshApi = ApiClient.refreshAuthApi,
+            tokenStore = tokenStore
+        )
         ledgerRepository = LedgerRepository(ApiClient.ledgerApi)
         budgetRepository = BudgetRepository(ApiClient.budgetApi)
         reportRepository = ReportRepository(ApiClient.reportApi)

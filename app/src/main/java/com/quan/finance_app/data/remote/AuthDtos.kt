@@ -24,6 +24,10 @@ data class GoogleLoginRequestDto(
     val idToken: String
 )
 
+data class RefreshRequestDto(
+    val refreshToken: String
+)
+
 data class AuthResponseDto(
     val accessToken: String,
     val tokenType: String,
