@@ -67,13 +67,12 @@ import com.quan.finance_app.ui.theme.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
+import com.quan.finance_app.data.AccountTimeZone
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val REPORT_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
 private val REPORT_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val REPORT_ZONE: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -477,7 +476,8 @@ fun ExpenseOverviewCard(
 ) {
     val selectedAmount = trend?.selectedAmount ?: 0L
     val momChangePercent = trend?.momChangePercent
-    val today = remember { LocalDate.now(REPORT_ZONE) }
+    val zone by AccountTimeZone.state.collectAsState()
+    val today = LocalDate.now(zone)
     val selectedYm = remember(year, month) { YearMonth.of(year, month) }
     val avgPerDay = remember(selectedAmount, selectedYm, today) {
         averagePerDay(selectedAmount, selectedYm, today)
@@ -606,7 +606,8 @@ fun MonthTransactionsLedgerCard(
     onClearDate: () -> Unit,
     onRetry: () -> Unit
 ) {
-    val today = remember { LocalDate.now(REPORT_ZONE) }
+    val zone by AccountTimeZone.state.collectAsState()
+    val today = LocalDate.now(zone)
     val yesterday = remember(today) { today.minusDays(1) }
 
     val monthGroups = transactionsData?.days ?: emptyList()
@@ -899,8 +900,9 @@ fun TransactionLedgerItemRow(txn: ReportTransactionItem) {
     val title = txn.merchant?.takeIf { it.isNotBlank() }
         ?: txn.note?.takeIf { it.isNotBlank() }
         ?: txn.categoryName
-    val timeText = remember(txn.occurredAt) {
-        txn.occurredAt.atZone(REPORT_ZONE).format(REPORT_TIME_FORMATTER)
+    val zone by AccountTimeZone.state.collectAsState()
+    val timeText = remember(txn.occurredAt, zone) {
+        txn.occurredAt.atZone(zone).format(REPORT_TIME_FORMATTER)
     }
     val icon = remember(txn.categoryName) {
         getCategoryIcon(txn.categoryName)

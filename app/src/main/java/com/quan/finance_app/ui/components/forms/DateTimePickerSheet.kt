@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +44,7 @@ fun DateTimePickerSheet(
     brandColor: Color,
     brandSoftColor: Color,
     modifier: Modifier = Modifier,
-    initialDate: LocalDate = LocalDate.now()
+    initialDate: LocalDate = TransactionTime.now().toLocalDate()
 ) {
     CalendarSheet(initialDate, null, brandColor, brandSoftColor, modifier, onDismissRequest) { date, _ ->
         onDateSelected(date)
@@ -78,7 +79,7 @@ private fun CalendarSheet(
     var currentMonth by rememberSaveable { mutableStateOf(YearMonth.from(initialDate)) }
     var selectedDate by rememberSaveable { mutableStateOf(initialDate) }
     val timed = initialTime != null
-    val today = if (timed) TransactionTime.now().toLocalDate() else LocalDate.now()
+    val today = TransactionTime.now().toLocalDate()
     var hour by rememberSaveable { mutableStateOf(initialTime?.let { "%02d".format(Locale.ROOT, it.hour) }.orEmpty()) }
     var minute by rememberSaveable { mutableStateOf(initialTime?.let { "%02d".format(Locale.ROOT, it.minute) }.orEmpty()) }
     val selectedHour = hour.toIntOrNull()
@@ -329,7 +330,7 @@ private fun CalendarGrid(
                         val isFuture = latestDate != null && date.isAfter(latestDate)
                         val hasEvent = dayNum % 5 == 0 && !isFuture // Mock event dot for visualization
                         
-                        val baseModifier = Modifier
+                        val baseModifier = Modifier.testTag("calendar-day-$date")
                             .weight(1f)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(12.dp))

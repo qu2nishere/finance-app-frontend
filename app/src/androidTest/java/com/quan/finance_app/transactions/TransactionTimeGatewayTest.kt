@@ -48,7 +48,8 @@ class TransactionTimeGatewayTest {
         val prefix = "QA-time-${key.take(8)}"
         check(!runBlocking { auth.hasSession() }) { "Use a dedicated test application" }
         runBlocking {
-            check(auth.register("time-$key@example.invalid", key, "Time QA") is AuthResult.Success)
+            val session = auth.register("time-$key@example.invalid", key, "Time QA") as AuthResult.Success
+            ServiceLocator.profileRepository.update(session.data.userId, zone.id)
             auth.finishOnboarding()
         }
         try {
@@ -85,14 +86,14 @@ class TransactionTimeGatewayTest {
                     openPicker()
                     if (index == 0) {
                         compose.onNodeWithContentDescription("Tháng sau").performClick()
-                        compose.onAllNodesWithText("15").onLast().performClick()
+                        compose.onNodeWithTag("calendar-day-${YearMonth.from(today).plusMonths(1).atDay(15)}").performClick()
                         compose.onNodeWithText("Chọn 15/", substring = true).performScrollTo().performClick()
                         waitText("Thời điểm giao dịch phải ở hiện tại hoặc quá khứ.")
                         tap("Hôm nay")
                     }
                     if (YearMonth.from(today) != YearMonth.from(date))
                         compose.onNodeWithContentDescription("Tháng trước").performClick()
-                    compose.onAllNodesWithText(date.dayOfMonth.toString()).onLast().performClick()
+                    compose.onNodeWithTag("calendar-day-$date").performClick()
                     enterTime(time)
                     tap("Chọn ${date.format(shortDate)} · $time")
                     if (index == 1) {
@@ -139,7 +140,7 @@ class TransactionTimeGatewayTest {
                 val report = compose.onNode(hasScrollToNodeAction())
                 report.performScrollToNode(hasText("Chọn ngày"))
                 tap("Chọn ngày")
-                compose.onAllNodesWithText(date.dayOfMonth.toString()).onLast().performClick()
+                compose.onNodeWithTag("calendar-day-$date").performClick()
                 compose.onAllNodes(hasSetTextAction() and hasText("Giờ")).assertCountEquals(0)
                 tap("Chọn ${date.format(shortDate)}")
                 waitText("Ngày ${date.format(shortDate)}")

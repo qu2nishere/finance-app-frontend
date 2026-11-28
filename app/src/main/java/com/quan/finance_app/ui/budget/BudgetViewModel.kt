@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 data class ExpenseCategoryOption(
@@ -45,8 +46,11 @@ class BudgetViewModel(
     private val _state = MutableStateFlow(BudgetUiState())
     val state: StateFlow<BudgetUiState> = _state.asStateFlow()
 
+    private var loadJob: Job? = null
+
     fun load() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update { it.copy(loading = true, errorMessage = null) }
             val categories = runCatching { expenseCategoriesProvider() }.getOrDefault(emptyList())
             when (val result = budgetRepository.getCurrentBudget()) {
@@ -110,6 +114,7 @@ class BudgetViewModel(
     }
 
     fun reset() {
+        loadJob?.cancel()
         _state.value = BudgetUiState()
     }
 

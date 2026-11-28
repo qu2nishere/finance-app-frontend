@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
+import com.quan.finance_app.data.AccountTimeZone
 import java.util.Locale
 
 data class IncomeFilterOption(
@@ -28,8 +28,8 @@ data class IncomeFilterOption(
 )
 
 data class ReportUiState(
-    val year: Int = YearMonth.now(USER_ZONE).year,
-    val month: Int = YearMonth.now(USER_ZONE).monthValue,
+    val year: Int = YearMonth.now(AccountTimeZone.current).year,
+    val month: Int = YearMonth.now(AccountTimeZone.current).monthValue,
     val selectedTab: Int = 0,
     val selectedIncomeCategoryId: String? = null,
     val selectedIncomeCategoryLabel: String = ALL_INCOME_LABEL,
@@ -57,7 +57,6 @@ data class ReportUiState(
         get() = String.format(Locale.ROOT, "%04d-%02d", year, month)
 
     companion object {
-        val USER_ZONE: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
         const val ALL_INCOME_LABEL = "Tất cả nguồn thu"
 
         val DEFAULT_INCOME_OPTIONS = listOf(
@@ -71,9 +70,9 @@ data class ReportUiState(
 
 class ReportViewModel(
     private val reportRepository: ReportRepository = ServiceLocator.reportRepository,
-    initialYearMonth: YearMonth = YearMonth.now(ReportUiState.USER_ZONE),
+    initialYearMonth: YearMonth = YearMonth.now(AccountTimeZone.current),
     autoLoadOnInit: Boolean = true,
-    private val currentYearMonthProvider: () -> YearMonth = { YearMonth.now(ReportUiState.USER_ZONE) }
+    private val currentYearMonthProvider: () -> YearMonth = { YearMonth.now(AccountTimeZone.current) }
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -95,7 +94,18 @@ class ReportViewModel(
         }
     }
 
+    private var sessionZone: java.time.ZoneId? = null
+
+    fun refreshForSession(zone: java.time.ZoneId) {
+        if (sessionZone != zone) {
+            reset()
+            sessionZone = zone
+        }
+        refresh()
+    }
+
     fun reset() {
+        sessionZone = null
         allJob?.cancel()
         trendJob?.cancel()
         transactionsJob?.cancel()
