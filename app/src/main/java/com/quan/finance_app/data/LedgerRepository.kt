@@ -89,6 +89,8 @@ class LedgerRepository(private val api: LedgerApi) {
         return ledgerCall { api.createTransaction(body) }
     }
 
+    suspend fun getTransaction(id: String): TransactionDto = api.getTransaction(id)
+
     suspend fun deleteTransaction(id: String): Result<Unit> {
         return ledgerCall { api.deleteTransaction(id) }
     }

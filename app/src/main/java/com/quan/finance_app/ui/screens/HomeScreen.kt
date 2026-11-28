@@ -348,7 +348,7 @@ fun DashboardTransactions(
                             amount = amountText,
                             amountColor = amountColor,
                             showClassify = txn.categoryId == null,
-                            onClick = { onOpenTransaction(title) },
+                            onClick = { onOpenTransaction(txn.id) },
                             onClassify = { onClassify(title) }
                         )
 

@@ -2,6 +2,7 @@ package com.quan.finance_app
 
 import android.os.Bundle
 import com.quan.finance_app.ui.transaction.AllTransactionsViewModel
+import com.quan.finance_app.ui.transaction.TransactionDetailViewModel
 import com.quan.finance_app.ui.transaction.TransactionViewModel
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -69,7 +70,7 @@ sealed interface Route {
     data object SavingsGoals : Route
     data class EditGoal(val goalId: String? = null) : Route
     data object AllTransactions : Route
-    data class TransactionDetail(val title: String) : Route
+    data class TransactionDetail(val id: String) : Route
     data object Wallets : Route
     data object Recurring : Route
     data object Export : Route
@@ -109,6 +110,7 @@ fun MainApp(
     homeViewModel: HomeViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel(),
     budgetViewModel: BudgetViewModel = viewModel(),
+    detailViewModel: TransactionDetailViewModel = viewModel(),
     historyViewModel: AllTransactionsViewModel = viewModel(),
     transactionViewModel: TransactionViewModel = viewModel(),
     goalsViewModel: GoalsViewModel = viewModel()
@@ -146,6 +148,7 @@ fun MainApp(
     }
 
     fun onSessionCleared() {
+        detailViewModel.reset()
         historyViewModel.reset()
         transactionViewModel.reset()
         homeViewModel.reset()
@@ -462,9 +465,9 @@ fun MainApp(
                             onOpenTransaction = { push(Route.TransactionDetail(it)) }
                         )
                         is Route.TransactionDetail -> TransactionDetailScreen(
-                            title = route.title,
-                            onBack = { pop() },
-                            onEdit = { openAddSheet() }
+                            id = route.id,
+                            detailViewModel = detailViewModel,
+                            onBack = { pop() }
                         )
                         Route.Wallets -> WalletsScreen(
                             onBack = { pop() },
