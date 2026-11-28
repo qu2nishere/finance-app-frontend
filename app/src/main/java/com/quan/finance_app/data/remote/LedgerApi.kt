@@ -39,6 +39,9 @@ interface LedgerApi {
     @POST("api/transactions")
     suspend fun createTransaction(@Body body: CreateTransactionDto): TransactionDto
 
+    @GET("api/transactions/{id}")
+    suspend fun getTransaction(@Path("id") id: String): TransactionDto
+
     @DELETE("api/transactions/{id}")
     suspend fun deleteTransaction(@Path("id") id: String)
 }

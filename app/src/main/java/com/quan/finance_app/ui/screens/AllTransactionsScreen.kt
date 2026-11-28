@@ -108,7 +108,7 @@ fun AllTransactionsScreen(
                 MfCard {
                     MfRow(title = txn.displayTitle(), icon = getCategoryIcon(txn.categoryName),
                         subtitle = listOfNotNull(transactionKind(txn.type), txn.categoryName, txn.walletName).joinToString(" · "),
-                        onClick = { onOpenTransaction(txn.displayTitle()) },
+                        onClick = { onOpenTransaction(txn.id) },
                         trailing = { Text(ledgerAmount(txn.signedAmount, txn.currencyCode)) })
                 }
             }
