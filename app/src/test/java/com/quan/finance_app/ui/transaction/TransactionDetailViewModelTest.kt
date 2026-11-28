@@ -12,6 +12,27 @@ class TransactionDetailViewModelTest {
     @Before fun setup() = Dispatchers.setMain(dispatcher)
     @After fun cleanup() = Dispatchers.resetMain()
 
+    @Test fun lostDeleteResponseAndRepeatedTapCanRetryAsMissing() = runTest(dispatcher) {
+        val row = TransactionDto("id", "w", null, null, null, null, null, "EXPENSE", 1, -1, "VND", "", "", null, null)
+        var calls = 0
+        val vm = TransactionDetailViewModel(remove = {
+            calls++
+            if (calls == 1) Result.failure(java.io.IOException("Dropped response"))
+            else Result.failure(retrofit2.HttpException(retrofit2.Response.error<Unit>(404,
+                okhttp3.ResponseBody.create(null, ""))))
+        }, fetch = { row })
+        vm.load(row.id)
+        advanceUntilIdle()
+        vm.delete(row.id)
+        vm.delete(row.id)
+        advanceUntilIdle()
+        assertEquals(1, calls)
+        assertNotNull(vm.state.value.message)
+        vm.delete(row.id)
+        advanceUntilIdle()
+        assertEquals(Removal.ALREADY_GONE, vm.state.value.removal)
+    }
+
     @Test fun previousIdAndPreviousSessionCannotPublishLateResults() = runTest(dispatcher) {
         val vm = TransactionDetailViewModel { id ->
             withContext(NonCancellable) { delay(100) }

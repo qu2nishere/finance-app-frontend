@@ -176,8 +176,9 @@ open class AuthRepository(
     /** Thu hồi phiên trên server rồi luôn xoá sạch token trên máy (kể cả khi mất mạng). */
     open suspend fun logout() = withContext(Dispatchers.IO) {
         val store = requireTokenStore()
-        val refresh = store.refreshToken
-        store.clear()
+        val refresh = synchronized(store.refreshLock) {
+            store.refreshToken.also { store.clear() }
+        }
         if (!refresh.isNullOrBlank()) {
             try {
                 requireRefreshApi().logout(RefreshRequestDto(refresh))
