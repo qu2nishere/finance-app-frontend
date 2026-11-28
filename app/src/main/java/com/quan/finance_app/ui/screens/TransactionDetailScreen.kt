@@ -12,8 +12,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.ui.components.core.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 import com.quan.finance_app.ui.transaction.TransactionDetailViewModel
+import com.quan.finance_app.ui.transaction.TransactionTime
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -42,7 +42,7 @@ fun TransactionDetailScreen(
                         Text(transactionKind(txn.type))
                     }
                 }
-                val timestamp = Instant.parse(txn.occurredAt).atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+                val timestamp = Instant.parse(txn.occurredAt).atZone(TransactionTime.zone)
                 DetailField("Ngày giờ", timestamp.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
                 DetailField("Ví", txn.walletName ?: "Ví không còn hiển thị")
                 DetailField("Danh mục", txn.categoryName ?: "Chưa phân loại")
