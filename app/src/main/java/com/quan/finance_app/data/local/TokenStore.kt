@@ -112,14 +112,20 @@ class TokenStore(
         }
         if (isPersisted && userId != null) editor.putString(KEY_ZONE, AccountTimeZone.current.id)
         else editor.remove(KEY_ZONE)
-        editor.apply()
+        // A remembered session must survive a process stop immediately after login.
+        // Session writes run under refreshLock on the authentication IO thread.
+        check(editor.commit()) { "Không thể lưu phiên đăng nhập trên thiết bị" }
     }
 
     @Synchronized
     internal fun updateAccess(access: String, timezone: String) {
         accessToken = access
         AccountTimeZone.activate(timezone)
-        if (isPersisted) prefs.edit().putString(KEY_ZONE, AccountTimeZone.current.id).apply()
+        if (isPersisted) {
+            check(prefs.edit().putString(KEY_ZONE, AccountTimeZone.current.id).commit()) {
+                "Không thể lưu múi giờ trên thiết bị"
+            }
+        }
     }
 
     @Synchronized
@@ -129,7 +135,7 @@ class TokenStore(
         ramUserId = null
         AccountTimeZone.activate(null)
         isPersisted = false
-        prefs.edit().clear().apply()
+        check(prefs.edit().clear().commit()) { "Không thể xoá phiên trên thiết bị" }
     }
 
     fun markSessionExpired() {
