@@ -1,6 +1,8 @@
 package com.quan.finance_app
 
 import android.os.Bundle
+import com.quan.finance_app.data.AccountTimeZone
+import com.quan.finance_app.data.ServiceLocator
 import com.quan.finance_app.ui.transaction.AllTransactionsViewModel
 import com.quan.finance_app.ui.transaction.TransactionDetailViewModel
 import com.quan.finance_app.ui.transaction.TransactionViewModel
@@ -78,6 +80,7 @@ sealed interface Route {
     data object NotificationSettings : Route
     data object Account : Route
     data object Security : Route
+    data object Timezone : Route
     data object Currency : Route
     data object Backup : Route
     data object AddWallet : Route
@@ -116,6 +119,7 @@ fun MainApp(
     goalsViewModel: GoalsViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
+    val zone by AccountTimeZone.state.collectAsState()
     val resetState by passwordResetViewModel.state.collectAsState()
     val goalsState by goalsViewModel.state.collectAsState()
     val context = LocalContext.current
@@ -144,7 +148,7 @@ fun MainApp(
         homeViewModel.loadData()
         budgetViewModel.load()
         goalsViewModel.load()
-        reportViewModel.refresh()
+        reportViewModel.refreshForSession(zone)
     }
 
     fun onSessionCleared() {
@@ -167,7 +171,7 @@ fun MainApp(
         authScreen = AuthScreen.LOGIN
     }
 
-    LaunchedEffect(auth.session, auth.onboardingPending) {
+    LaunchedEffect(auth.session, auth.onboardingPending, zone) {
         when {
             auth.session == SessionStatus.LoggedIn && !auth.onboardingPending -> onSessionStarted()
             auth.session == SessionStatus.LoggedOut -> onSessionCleared()
@@ -419,6 +423,7 @@ fun MainApp(
                             onEditGoal = { push(Route.EditGoal(it)) }
                         )
                         3 -> ProfileScreen(
+                            onNavigateToTimezone = { push(Route.Timezone) },
                             onNavigateToCategories = { push(Route.Categories) },
                             onNavigateToSavingsGoals = { push(Route.SavingsGoals) },
                             onNavigateToWallets = { push(Route.Wallets) },
@@ -497,6 +502,9 @@ fun MainApp(
                         )
                         Route.NotificationSettings -> NotificationSettingsScreen(onBack = { pop() })
                         Route.Security -> SecurityScreen(onBack = { pop() })
+                        Route.Timezone -> ServiceLocator.tokenStore.userId?.let { userId ->
+                            TimezoneSettingsScreen(userId, onBack = { pop() })
+                        }
                         Route.Currency -> CurrencySettingsScreen(onBack = { pop() })
                         Route.Backup -> BackupSyncScreen(onBack = { pop() })
                         Route.AddWallet -> AddWalletScreen(onBack = { pop() })

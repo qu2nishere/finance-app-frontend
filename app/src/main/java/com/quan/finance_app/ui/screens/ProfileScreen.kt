@@ -31,6 +31,7 @@ fun ProfileScreen(
     onNavigateToRecurring: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
+    onNavigateToTimezone: () -> Unit = {},
     onNavigateToCurrency: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onDeleteAllData: () -> Unit = {},
@@ -38,6 +39,7 @@ fun ProfileScreen(
     onNavigateToNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val zone by com.quan.finance_app.data.AccountTimeZone.state.collectAsState()
     var isDarkModeEnabled by remember { mutableStateOf(false) }
     var isBiometricLockEnabled by remember { mutableStateOf(true) }
 
@@ -186,6 +188,14 @@ fun ProfileScreen(
                         onCheckedChange = { isBiometricLockEnabled = it }
                     )
 
+                    HorizontalDivider(color = Ink100)
+
+                    SettingNavigationRow(
+                        icon = Icons.Outlined.Schedule,
+                        title = "Múi giờ",
+                        trailingText = zone.id,
+                        onClick = onNavigateToTimezone
+                    )
                     HorizontalDivider(color = Ink100)
 
                     // Ngôn ngữ

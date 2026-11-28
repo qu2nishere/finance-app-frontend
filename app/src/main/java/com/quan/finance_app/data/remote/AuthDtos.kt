@@ -12,7 +12,8 @@ package com.quan.finance_app.data.remote
 data class RegisterRequestDto(
     val email: String,
     val password: String,
-    val fullName: String
+    val fullName: String,
+    val timezone: String? = null
 )
 
 data class LoginRequestDto(
@@ -21,7 +22,8 @@ data class LoginRequestDto(
 )
 
 data class GoogleLoginRequestDto(
-    val idToken: String
+    val idToken: String,
+    val timezone: String? = null
 )
 
 data class RefreshRequestDto(
@@ -50,7 +52,8 @@ data class AuthResponseDto(
     val userId: String,
     val email: String,
     val fullName: String,
-    val refreshToken: String? = null
+    val refreshToken: String? = null,
+    val timezone: String? = null
 )
 
 /**

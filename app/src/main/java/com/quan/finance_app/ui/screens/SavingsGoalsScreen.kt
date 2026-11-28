@@ -32,7 +32,7 @@ import com.quan.finance_app.ui.budget.GoalsViewModel
 import com.quan.finance_app.ui.components.core.MfInfoBanner
 import com.quan.finance_app.ui.theme.*
 import java.time.LocalDate
-import java.time.ZoneId
+import com.quan.finance_app.data.AccountTimeZone
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
@@ -92,6 +92,8 @@ fun SavingsGoalsScreen(
     onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val zone by AccountTimeZone.state.collectAsState()
+    val today = LocalDate.now(zone)
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -242,7 +244,7 @@ fun SavingsGoalsScreen(
                     title = goal.name,
                     spentAmount = shortVnd(goal.savedAmount),
                     targetAmount = shortVnd(goal.targetAmount),
-                    subInfo = buildGoalSubInfo(goal),
+                    subInfo = buildGoalSubInfo(goal, today),
                     progress = progress,
                     progressColor = accent,
                     onClick = { onEditGoal(goal.id) },
@@ -266,7 +268,7 @@ fun SavingsGoalsScreen(
 
             items(state.completedGoals, key = { it.id }) { goal ->
                 val completedMonth = goal.completedAt
-                    ?.atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+                    ?.atZone(zone)
                     ?.format(MONTH_YEAR_FMT)
                 val info = buildString {
                     append("Hoàn thành")
@@ -283,14 +285,13 @@ fun SavingsGoalsScreen(
     }
 }
 
-private fun buildGoalSubInfo(goal: SavingsGoalItem): String {
+private fun buildGoalSubInfo(goal: SavingsGoalItem, today: LocalDate): String {
     val remaining = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0L)
     val deadline = goal.targetDate ?: return if (goal.walletName != null) {
         "Ví ${goal.walletName}"
     } else {
         "Còn thiếu ${shortVnd(remaining)}"
     }
-    val today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"))
     val monthsLeft = ChronoUnit.MONTHS.between(today.withDayOfMonth(1), deadline.withDayOfMonth(1))
         .coerceAtLeast(1L)
     val perMonth = (remaining + monthsLeft - 1) / monthsLeft

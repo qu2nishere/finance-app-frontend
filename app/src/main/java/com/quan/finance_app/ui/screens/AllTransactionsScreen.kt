@@ -143,7 +143,7 @@ fun AllTransactionsScreen(
             change(if (edge == "from") filter.copy(from = date, to = filter.to?.coerceAtLeast(date))
                 else filter.copy(to = date, from = filter.from?.coerceAtMost(date)))
         }, brandColor = Blue600, brandSoftColor = Blue50,
-            initialDate = selected?.let(LocalDate::parse) ?: LocalDate.now())
+            initialDate = selected?.let(LocalDate::parse) ?: LocalDate.now(com.quan.finance_app.data.AccountTimeZone.current))
     }
 }
 

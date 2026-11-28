@@ -31,7 +31,7 @@ import com.quan.finance_app.ui.budget.WalletOption
 import com.quan.finance_app.ui.components.core.*
 import com.quan.finance_app.ui.theme.*
 import java.time.LocalDate
-import java.time.ZoneId
+import com.quan.finance_app.data.AccountTimeZone
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
@@ -140,7 +140,8 @@ fun EditGoalScreen(
     modifier: Modifier = Modifier
 ) {
     val isEditMode = goal != null
-    val today = remember { LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")) }
+    val zone by AccountTimeZone.state.collectAsState()
+    val today = LocalDate.now(zone)
 
     var goalName by remember(goal?.id) { mutableStateOf(goal?.name ?: "") }
     var targetDigits by remember(goal?.id) { mutableStateOf(goal?.targetAmount?.toString() ?: "") }

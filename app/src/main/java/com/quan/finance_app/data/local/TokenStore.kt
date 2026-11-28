@@ -1,6 +1,7 @@
 package com.quan.finance_app.data.local
 
 import android.content.Context
+import com.quan.finance_app.data.AccountTimeZone
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +45,7 @@ class TokenStore(
             prefs.edit().remove(KEY_LEGACY_REFRESH).apply()
         }
         isPersisted = prefs.contains(KEY_REFRESH_ENC)
+        AccountTimeZone.activate(if (isPersisted && userId != null) prefs.getString(KEY_ZONE, null) else null)
     }
 
     @get:Synchronized
@@ -75,9 +77,11 @@ class TokenStore(
         access: String,
         refresh: String?,
         persist: Boolean = true,
-        userId: String? = this.userId
+        userId: String? = this.userId,
+        timezone: String? = null
     ) {
         accessToken = access
+        if (timezone != null || userId != this.userId) AccountTimeZone.activate(timezone)
         ramRefreshToken = refresh
         ramUserId = userId
         isPersisted = persist && refresh != null
@@ -106,7 +110,22 @@ class TokenStore(
             editor.remove(KEY_REFRESH_ENC)
             editor.remove(KEY_USER_ID)
         }
-        editor.apply()
+        if (isPersisted && userId != null) editor.putString(KEY_ZONE, AccountTimeZone.current.id)
+        else editor.remove(KEY_ZONE)
+        // A remembered session must survive a process stop immediately after login.
+        // Session writes run under refreshLock on the authentication IO thread.
+        check(editor.commit()) { "Không thể lưu phiên đăng nhập trên thiết bị" }
+    }
+
+    @Synchronized
+    internal fun updateAccess(access: String, timezone: String) {
+        accessToken = access
+        AccountTimeZone.activate(timezone)
+        if (isPersisted) {
+            check(prefs.edit().putString(KEY_ZONE, AccountTimeZone.current.id).commit()) {
+                "Không thể lưu múi giờ trên thiết bị"
+            }
+        }
     }
 
     @Synchronized
@@ -114,8 +133,9 @@ class TokenStore(
         accessToken = null
         ramRefreshToken = null
         ramUserId = null
+        AccountTimeZone.activate(null)
         isPersisted = false
-        prefs.edit().clear().apply()
+        check(prefs.edit().clear().commit()) { "Không thể xoá phiên trên thiết bị" }
     }
 
     fun markSessionExpired() {
@@ -132,5 +152,6 @@ class TokenStore(
         const val KEY_LEGACY_REFRESH = "refresh_token"
         const val KEY_REFRESH_ENC = "refresh_token_enc"
         const val KEY_USER_ID = "user_id"
+        const val KEY_ZONE = "account_timezone"
     }
 }

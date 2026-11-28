@@ -20,6 +20,9 @@ object ServiceLocator {
     lateinit var authRepository: AuthRepository
         private set
 
+    lateinit var profileRepository: ProfileRepository
+        private set
+
     lateinit var ledgerRepository: LedgerRepository
         private set
 
@@ -40,6 +43,7 @@ object ServiceLocator {
             tokenStore = tokenStore,
             onboardingStore = onboardingStore
         )
+        profileRepository = ProfileRepository(ApiClient.profileApi, tokenStore, authRepository)
         ledgerRepository = LedgerRepository(ApiClient.ledgerApi)
         budgetRepository = BudgetRepository(ApiClient.budgetApi)
         reportRepository = ReportRepository(ApiClient.reportApi)

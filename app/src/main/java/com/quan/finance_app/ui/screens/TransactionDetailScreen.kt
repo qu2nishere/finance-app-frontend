@@ -12,7 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.ui.components.core.*
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
 import com.quan.finance_app.ui.transaction.TransactionDetailViewModel
-import com.quan.finance_app.ui.transaction.TransactionTime
+import com.quan.finance_app.data.AccountTimeZone
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
@@ -24,6 +24,7 @@ fun TransactionDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val state by detailViewModel.state.collectAsState()
+    val zone by AccountTimeZone.state.collectAsState()
     var confirm by androidx.compose.runtime.saveable.rememberSaveable(id) { mutableStateOf(false) }
     LaunchedEffect(id) { detailViewModel.load(id) }
     Column(modifier.fillMaxSize().background(MoneyFlowTheme.colors.surfacePage)
@@ -42,7 +43,7 @@ fun TransactionDetailScreen(
                         Text(transactionKind(txn.type))
                     }
                 }
-                val timestamp = Instant.parse(txn.occurredAt).atZone(TransactionTime.zone)
+                val timestamp = Instant.parse(txn.occurredAt).atZone(zone)
                 DetailField("Ngày giờ", timestamp.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
                 DetailField("Ví", txn.walletName ?: "Ví không còn hiển thị")
                 DetailField("Danh mục", txn.categoryName ?: "Chưa phân loại")
