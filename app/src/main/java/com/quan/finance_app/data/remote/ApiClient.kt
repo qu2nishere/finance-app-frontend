@@ -26,7 +26,7 @@ object ApiClient {
     /** Không in body các endpoint xác thực ra Logcat vì chứa accessToken và refreshToken. */
     private val safeLogging = Interceptor { chain ->
         val path = chain.request().url.encodedPath
-        val isAuthEndpoint = path.startsWith("/api/auth") || path.startsWith("/api/v1/auth")
+        val isAuthEndpoint = path.startsWith("/api/auth") || path.startsWith("/api/v1/auth") || path == "/api/users/me"
         val delegate = if (isAuthEndpoint) headerLogger else bodyLogger
         delegate.intercept(chain)
     }
@@ -92,6 +92,7 @@ object ApiClient {
         .build()
 
     val authApi: AuthApi = retrofit.create(AuthApi::class.java)
+    val profileApi: ProfileApi = retrofit.create(ProfileApi::class.java)
     val ledgerApi: LedgerApi = retrofit.create(LedgerApi::class.java)
     val budgetApi: BudgetApi = retrofit.create(BudgetApi::class.java)
     val reportApi: ReportApi = retrofit.create(ReportApi::class.java)

@@ -91,7 +91,7 @@ open class AuthRepository(
         rememberMe: Boolean = true
     ): AuthResult {
         val result = perform(rememberMe) {
-            requireApi().register(RegisterRequestDto(email.trim(), password, fullName.trim()))
+            requireApi().register(RegisterRequestDto(email.trim(), password, fullName.trim(), AccountTimeZone.deviceRegion()))
         }
         if (result is AuthResult.Success) {
             withContext(Dispatchers.IO) {
@@ -113,7 +113,7 @@ open class AuthRepository(
         idToken: String,
         rememberMe: Boolean = true
     ): AuthResult = perform(rememberMe) {
-        requireApi().loginWithGoogle(GoogleLoginRequestDto(idToken))
+        requireApi().loginWithGoogle(GoogleLoginRequestDto(idToken, AccountTimeZone.deviceRegion()))
     }
 
     open suspend fun requestPasswordReset(email: String): PasswordResetResult =
@@ -146,31 +146,37 @@ open class AuthRepository(
                 return@withContext SessionResult.Restored
             }
 
-            val refresh = store.refreshToken ?: return@withContext SessionResult.NoSession
-            val response = try {
-                requireRefreshApi().refreshCall(RefreshRequestDto(refresh)).execute()
-            } catch (_: IOException) {
-                return@withContext SessionResult.Offline
-            }
-
-            val body = response.body()
-            if (response.isSuccessful && body != null && body.accessToken.isNotBlank()) {
-                store.save(
-                    access = body.accessToken,
-                    refresh = body.refreshToken ?: refresh,
-                    persist = store.isPersisted,
-                    userId = body.userId
-                )
-                return@withContext SessionResult.Restored
-            }
-
-            // 400/401/403 -> token đã hết hạn hoặc bị thu hồi; 5xx (vd gateway 502 khi dừng service) coi như Offline
-            if (response.code() in 400..499) {
-                store.clear()
-                return@withContext SessionResult.Expired
-            }
-            SessionResult.Offline
+            refreshStoredSession(store)
         }
+    }
+
+    /** Caller holds the session lock on an IO thread, including when a profile changed remotely. */
+    internal fun refreshStoredSession(store: TokenStore): SessionResult {
+        val refresh = store.refreshToken ?: return SessionResult.NoSession
+        val response = try {
+            requireRefreshApi().refreshCall(RefreshRequestDto(refresh)).execute()
+        } catch (_: IOException) {
+            return SessionResult.Offline
+        }
+
+        val body = response.body()
+        if (response.isSuccessful && body != null && body.accessToken.isNotBlank()) {
+            store.save(
+                access = body.accessToken,
+                refresh = body.refreshToken ?: refresh,
+                persist = store.isPersisted,
+                userId = body.userId,
+                timezone = body.timezone
+            )
+            return SessionResult.Restored
+        }
+
+        // 400/401/403 -> token đã hết hạn hoặc bị thu hồi; 5xx (vd gateway 502 khi dừng service) coi như Offline
+        if (response.code() in 400..499) {
+            store.clear()
+            return SessionResult.Expired
+        }
+        return SessionResult.Offline
     }
 
     /** Thu hồi phiên trên server rồi luôn xoá sạch token trên máy (kể cả khi mất mạng). */
@@ -202,12 +208,16 @@ open class AuthRepository(
 
             if (response.isSuccessful && body != null) {
                 withContext(Dispatchers.IO) {
-                    requireTokenStore().save(
-                        access = body.accessToken,
-                        refresh = body.refreshToken,
-                        persist = rememberMe,
-                        userId = body.userId
-                    )
+                    val store = requireTokenStore()
+                    synchronized(store.refreshLock) {
+                        store.save(
+                            access = body.accessToken,
+                            refresh = body.refreshToken,
+                            persist = rememberMe,
+                            userId = body.userId,
+                            timezone = body.timezone
+                        )
+                    }
                 }
                 AuthResult.Success(body)
             } else {
