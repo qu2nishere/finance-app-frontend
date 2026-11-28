@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +32,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -47,9 +49,9 @@ import com.quan.finance_app.ui.components.forms.CalculatorKeypad
 import com.quan.finance_app.ui.theme.FontCore
 import com.quan.finance_app.ui.theme.FontMono
 import com.quan.finance_app.ui.theme.MoneyFlowTheme
+import com.quan.finance_app.ui.transaction.TransactionTime
 import com.quan.finance_app.ui.transaction.TransactionViewModel
 import java.text.NumberFormat
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -65,25 +67,25 @@ fun AddTransactionScreen(
 ) {
     val uiState by transactionViewModel.state.collectAsState()
 
-    var isExpense by remember { mutableStateOf(!startWithIncome) }
+    var isExpense by rememberSaveable { mutableStateOf(!startWithIncome) }
     // Mọi nút trên màn này theo loại giao dịch: chi màu cam, thu màu xanh lá
     val flowColor = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn
     val flowSoftColor = if (isExpense) MoneyFlowTheme.colors.surfaceOutSoft else MoneyFlowTheme.colors.surfaceInSoft
     // ViewModel sống theo Activity nên còn giữ loại thu/chi của lần mở trước —
     // đồng bộ lại mỗi lần mở để giao diện và dữ liệu gửi lên luôn khớp nhau
-    LaunchedEffect(Unit) { transactionViewModel.setExpense(!startWithIncome) }
-    var autoSaveEnabled by remember { mutableStateOf(true) }
-    var autoSavePercent by remember { mutableIntStateOf(20) }
-    var expression by remember { mutableStateOf("") }
-    var noteText by remember { mutableStateOf("") }
-    var nameText by remember { mutableStateOf("") }
-    var showCalculator by remember { mutableStateOf(false) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showCategoryPicker by remember { mutableStateOf(false) }
-    var showWalletPicker by remember { mutableStateOf(false) }
-    var showNoteDialog by remember { mutableStateOf(false) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("vi", "VN")) }
+    LaunchedEffect(Unit) { transactionViewModel.setExpense(isExpense) }
+    var autoSaveEnabled by rememberSaveable { mutableStateOf(true) }
+    var autoSavePercent by rememberSaveable { mutableIntStateOf(20) }
+    var expression by rememberSaveable { mutableStateOf("") }
+    var noteText by rememberSaveable { mutableStateOf("") }
+    var nameText by rememberSaveable { mutableStateOf("") }
+    var showCalculator by rememberSaveable { mutableStateOf(false) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showCategoryPicker by rememberSaveable { mutableStateOf(false) }
+    var showWalletPicker by rememberSaveable { mutableStateOf(false) }
+    var showNoteDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedDateTime by rememberSaveable { mutableStateOf(TransactionTime.now()) }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale("vi", "VN")) }
 
     // Evaluator
     val calculatedAmount = remember(expression) {
@@ -267,6 +269,7 @@ fun AddTransactionScreen(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .testTag("transactionName")
                         .padding(horizontal = 20.dp)
                 )
 
@@ -410,9 +413,9 @@ fun AddTransactionScreen(
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, tint = flowColor, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.CalendarToday, contentDescription = "Chọn ngày giờ giao dịch", tint = flowColor, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = selectedDate.format(dateFormatter), style = MoneyFlowTheme.typography.caption, color = flowColor, fontFamily = FontCore)
+                        Text(text = selectedDateTime.format(dateFormatter), style = MoneyFlowTheme.typography.caption, color = flowColor, fontFamily = FontCore)
                     }
 
                     // Note Action
@@ -479,7 +482,7 @@ fun AddTransactionScreen(
                         val amountLong = calculatedAmount.toLong()
                         transactionViewModel.submitTransaction(
                             amount = amountLong,
-                            date = selectedDate,
+                            dateTime = selectedDateTime,
                             note = noteText,
                             name = nameText,
                             onSuccess = {
@@ -560,9 +563,10 @@ fun AddTransactionScreen(
     }
 
     if (showDatePicker) {
-        com.quan.finance_app.ui.components.forms.DateTimePickerSheet(
+        com.quan.finance_app.ui.components.forms.TransactionDateTimePickerSheet(
+            initial = selectedDateTime,
             onDismissRequest = { showDatePicker = false },
-            onDateSelected = { date -> selectedDate = date },
+            onSelected = { selectedDateTime = it },
             brandColor = if (isExpense) MoneyFlowTheme.colors.flowOut else MoneyFlowTheme.colors.flowIn,
             brandSoftColor = if (isExpense) MoneyFlowTheme.colors.surfaceOutSoft else MoneyFlowTheme.colors.surfaceInSoft
         )

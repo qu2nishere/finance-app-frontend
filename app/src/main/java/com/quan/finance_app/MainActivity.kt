@@ -128,12 +128,12 @@ fun MainApp(
     val backStack = remember { mutableStateListOf<Route>() }
 
     // Lớp phủ toàn màn — không nằm trong back stack vì chúng đóng bằng nút riêng
-    var showAddSheet by remember { mutableStateOf(false) }
+    var showAddSheet by rememberSaveable { mutableStateOf(false) }
     // Mở màn thêm giao dịch ở sẵn tab Thu nhập (nút "+ Thu", sửa nguồn thu)
-    var addSheetStartsWithIncome by remember { mutableStateOf(false) }
+    var addSheetStartsWithIncome by rememberSaveable { mutableStateOf(false) }
     // Tự trích mở từ màn thêm giao dịch: phủ lên trên chứ không đóng màn đó,
     // để back quay lại đúng màn thu với số tiền/danh mục đang nhập dở
-    var showAutoSaveOverAdd by remember { mutableStateOf(false) }
+    var showAutoSaveOverAdd by rememberSaveable { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
     var goalDepositTarget by remember { mutableStateOf<String?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }

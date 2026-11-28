@@ -2,29 +2,35 @@ package com.quan.finance_app.ui.components.forms
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.quan.finance_app.ui.theme.MoneyFlowTheme
 import com.quan.finance_app.ui.theme.FontCore
+import com.quan.finance_app.ui.theme.MoneyFlowTheme
+import com.quan.finance_app.ui.transaction.TransactionTime
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -39,15 +45,54 @@ fun DateTimePickerSheet(
     modifier: Modifier = Modifier,
     initialDate: LocalDate = LocalDate.now()
 ) {
+    CalendarSheet(initialDate, null, brandColor, brandSoftColor, modifier, onDismissRequest) { date, _ ->
+        onDateSelected(date)
+    }
+}
+
+@Composable
+fun TransactionDateTimePickerSheet(
+    initial: LocalDateTime,
+    onDismissRequest: () -> Unit,
+    onSelected: (LocalDateTime) -> Unit,
+    brandColor: Color,
+    brandSoftColor: Color
+) {
+    CalendarSheet(initial.toLocalDate(), initial.toLocalTime(), brandColor, brandSoftColor,
+        Modifier, onDismissRequest) { date, time -> onSelected(date.atTime(requireNotNull(time))) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CalendarSheet(
+    initialDate: LocalDate,
+    initialTime: LocalTime?,
+    brandColor: Color,
+    brandSoftColor: Color,
+    modifier: Modifier,
+    onDismissRequest: () -> Unit,
+    onSelected: (LocalDate, LocalTime?) -> Unit
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
-    var currentMonth by remember { mutableStateOf(YearMonth.from(initialDate)) }
-    var selectedDate by remember { mutableStateOf(initialDate) }
+    var currentMonth by rememberSaveable { mutableStateOf(YearMonth.from(initialDate)) }
+    var selectedDate by rememberSaveable { mutableStateOf(initialDate) }
+    val timed = initialTime != null
+    val today = if (timed) TransactionTime.now().toLocalDate() else LocalDate.now()
+    var hour by rememberSaveable { mutableStateOf(initialTime?.let { "%02d".format(Locale.ROOT, it.hour) }.orEmpty()) }
+    var minute by rememberSaveable { mutableStateOf(initialTime?.let { "%02d".format(Locale.ROOT, it.minute) }.orEmpty()) }
+    val selectedHour = hour.toIntOrNull()
+    val selectedMinute = minute.toIntOrNull()
+    val time = if (selectedHour != null && selectedHour in 0..23 &&
+        selectedMinute != null && selectedMinute in 0..59
+    ) LocalTime.of(selectedHour, selectedMinute) else null
+    var futureError by rememberSaveable(selectedDate, hour, minute) { mutableStateOf(false) }
     val formatter = DateTimeFormatter.ofPattern("M, yyyy", Locale("vi", "VN"))
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        modifier = modifier,
         containerColor = MoneyFlowTheme.colors.surfaceCard,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
@@ -64,7 +109,8 @@ fun DateTimePickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 20.dp)
         ) {
             // Header
@@ -76,13 +122,13 @@ fun DateTimePickerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Chọn ngày & giờ",
+                    text = if (timed) "Chọn ngày và giờ" else "Chọn ngày",
                     style = MoneyFlowTheme.typography.title2,
                     color = MoneyFlowTheme.colors.textPrimary,
                     fontFamily = FontCore
                 )
                 IconButton(onClick = onDismissRequest) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MoneyFlowTheme.colors.textSecondary)
+                    Icon(Icons.Default.Close, contentDescription = "Đóng", tint = MoneyFlowTheme.colors.textSecondary)
                 }
             }
 
@@ -93,13 +139,16 @@ fun DateTimePickerSheet(
                         .width(120.dp)
                         .height(36.dp)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(brandColor)
-                        .clickable { selectedDate = LocalDate.now() },
+                        .background(brandSoftColor)
+                        .clickable {
+                            selectedDate = today
+                            currentMonth = YearMonth.from(today)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Hôm nay",
-                        color = Color.White,
+                        color = brandColor,
                         style = MoneyFlowTheme.typography.caption,
                         fontWeight = FontWeight.Bold
                     )
@@ -115,7 +164,7 @@ fun DateTimePickerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                    Icon(Icons.Outlined.ChevronLeft, contentDescription = "Previous Month", tint = MoneyFlowTheme.colors.textSecondary)
+                    Icon(Icons.Outlined.ChevronLeft, contentDescription = "Tháng trước", tint = MoneyFlowTheme.colors.textSecondary)
                 }
                 Text(
                     text = "Tháng ${currentMonth.format(formatter)}",
@@ -124,7 +173,7 @@ fun DateTimePickerSheet(
                     fontFamily = FontCore
                 )
                 IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
-                    Icon(Icons.Outlined.ChevronRight, contentDescription = "Next Month", tint = MoneyFlowTheme.colors.textSecondary)
+                    Icon(Icons.Outlined.ChevronRight, contentDescription = "Tháng sau", tint = MoneyFlowTheme.colors.textSecondary)
                 }
             }
 
@@ -135,43 +184,23 @@ fun DateTimePickerSheet(
                 currentMonth = currentMonth,
                 selectedDate = selectedDate,
                 onDateSelected = { selectedDate = it },
+                latestDate = if (timed) null else today,
                 brandColor = brandColor
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Time Selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .background(Color.White, RoundedCornerShape(16.dp))
-                    .border(1.dp, MoneyFlowTheme.colors.borderSubtle, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(brandSoftColor, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Outlined.AccessTime, contentDescription = null, tint = brandColor, modifier = Modifier.size(20.dp))
+            if (timed) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TimeField("Giờ", hour, { hour = it }, Modifier.weight(1f))
+                    TimeField("Phút", minute, { minute = it }, Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Giờ",
-                    style = MoneyFlowTheme.typography.body,
-                    color = MoneyFlowTheme.colors.textSecondary,
-                    fontFamily = FontCore
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "09:12",
-                    style = MoneyFlowTheme.typography.body.copy(fontWeight = FontWeight.Bold),
-                    color = MoneyFlowTheme.colors.textPrimary,
-                    fontFamily = FontCore
-                )
+                val error = when {
+                    time == null -> "Nhập giờ từ 00 đến 23 và phút từ 00 đến 59."
+                    futureError -> "Thời điểm giao dịch phải ở hiện tại hoặc quá khứ."
+                    else -> null
+                }
+                if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -201,18 +230,23 @@ fun DateTimePickerSheet(
                 }
                 Button(
                     onClick = { 
-                        onDateSelected(selectedDate)
-                        onDismissRequest()
+                        if (time != null && selectedDate.atTime(time) > TransactionTime.now()) {
+                            futureError = true
+                        } else {
+                            onSelected(selectedDate, time)
+                            onDismissRequest()
+                        }
                     },
                     modifier = Modifier
                         .weight(2f)
                         .height(56.dp),
+                    enabled = !timed || time != null,
                     colors = ButtonDefaults.buttonColors(containerColor = brandColor),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     val dateFormatted = selectedDate.format(DateTimeFormatter.ofPattern("dd/MM", Locale("vi", "VN")))
                     Text(
-                        text = "Chọn $dateFormatted - 09:12",
+                        text = if (time == null) "Chọn $dateFormatted" else "Chọn $dateFormatted · $time",
                         color = Color.White,
                         style = MoneyFlowTheme.typography.body,
                         fontWeight = FontWeight.Bold
@@ -224,8 +258,21 @@ fun DateTimePickerSheet(
 }
 
 @Composable
-fun CalendarGrid(
+private fun TimeField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { if (it.length <= 2 && it.all { digit -> digit in '0'..'9' }) onChange(it) },
+        label = { Text(label) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        singleLine = true,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun CalendarGrid(
     currentMonth: YearMonth,
+    latestDate: LocalDate?,
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
     brandColor: Color
@@ -279,7 +326,7 @@ fun CalendarGrid(
                     if (isCurrentMonth) {
                         val date = currentMonth.atDay(dayNum)
                         val isSelected = date == selectedDate
-                        val isFuture = date.isAfter(LocalDate.now())
+                        val isFuture = latestDate != null && date.isAfter(latestDate)
                         val hasEvent = dayNum % 5 == 0 && !isFuture // Mock event dot for visualization
                         
                         val baseModifier = Modifier

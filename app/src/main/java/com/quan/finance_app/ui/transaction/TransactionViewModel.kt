@@ -7,17 +7,15 @@ import com.quan.finance_app.data.ServiceLocator
 import com.quan.finance_app.data.remote.CategoryDto
 import com.quan.finance_app.data.remote.CreateTransactionDto
 import com.quan.finance_app.data.remote.WalletDto
-import kotlinx.coroutines.cancelChildren
+import java.time.LocalDateTime
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 data class TransactionUiState(
     val categories: List<CategoryDto> = emptyList(),
@@ -77,6 +75,7 @@ class TransactionViewModel(
     }
 
     fun setExpense(isExpense: Boolean) {
+        if (_state.value.isExpense == isExpense) return
         val defaultCat = _state.value.categories.firstOrNull {
             if (isExpense) it.flow == "EXPENSE" else it.flow == "INCOME"
         }
@@ -153,12 +152,17 @@ class TransactionViewModel(
 
     fun submitTransaction(
         amount: Long,
-        date: LocalDate,
+        dateTime: LocalDateTime,
         note: String,
         name: String = "",
         onSuccess: () -> Unit
     ) {
         val current = _state.value
+        if (current.isSubmitting) return
+        if (dateTime > TransactionTime.now()) {
+            _state.update { it.copy(errorMessage = "Thời điểm giao dịch phải ở hiện tại hoặc quá khứ.") }
+            return
+        }
         val wallet = current.selectedWallet
         if (wallet == null) {
             _state.update { it.copy(errorMessage = "Vui lòng chọn ví") }
@@ -170,8 +174,7 @@ class TransactionViewModel(
         }
 
         val type = if (current.isExpense) "EXPENSE" else "INCOME"
-        val instant = date.atStartOfDay(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant()
-        val occurredAtStr = DateTimeFormatter.ISO_INSTANT.format(instant)
+        val occurredAtStr = TransactionTime.toInstant(dateTime).toString()
 
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true, errorMessage = null) }
