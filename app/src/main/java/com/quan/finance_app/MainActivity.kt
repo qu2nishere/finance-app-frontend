@@ -1,6 +1,8 @@
 package com.quan.finance_app
 
 import android.os.Bundle
+import com.quan.finance_app.ui.transaction.AllTransactionsViewModel
+import com.quan.finance_app.ui.transaction.TransactionViewModel
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -107,6 +109,8 @@ fun MainApp(
     homeViewModel: HomeViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel(),
     budgetViewModel: BudgetViewModel = viewModel(),
+    historyViewModel: AllTransactionsViewModel = viewModel(),
+    transactionViewModel: TransactionViewModel = viewModel(),
     goalsViewModel: GoalsViewModel = viewModel()
 ) {
     val auth by authViewModel.state.collectAsState()
@@ -134,6 +138,7 @@ fun MainApp(
     var showDeleteData by remember { mutableStateOf(false) }
 
     fun onSessionStarted() {
+        transactionViewModel.loadData()
         homeViewModel.loadData()
         budgetViewModel.load()
         goalsViewModel.load()
@@ -141,6 +146,8 @@ fun MainApp(
     }
 
     fun onSessionCleared() {
+        historyViewModel.reset()
+        transactionViewModel.reset()
         homeViewModel.reset()
         reportViewModel.reset()
         budgetViewModel.reset()
@@ -450,6 +457,7 @@ fun MainApp(
                             }
                         )
                         Route.AllTransactions -> AllTransactionsScreen(
+                            allTransactionsViewModel = historyViewModel,
                             onBack = { pop() },
                             onOpenTransaction = { push(Route.TransactionDetail(it)) }
                         )
@@ -492,10 +500,12 @@ fun MainApp(
             exit = overlaySlideDown
         ) {
             AddTransactionScreen(
+                transactionViewModel = transactionViewModel,
                 onDismissRequest = { showAddSheet = false },
                 startWithIncome = addSheetStartsWithIncome,
                 onOpenAutoSave = { showAutoSaveOverAdd = true },
                 onTransactionCreated = {
+                    historyViewModel.refreshIfOpened()
                     homeViewModel.loadData()
                     budgetViewModel.load()
                 }

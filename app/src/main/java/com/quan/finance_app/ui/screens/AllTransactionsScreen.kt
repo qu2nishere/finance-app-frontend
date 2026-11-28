@@ -1,53 +1,50 @@
 package com.quan.finance_app.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.quan.finance_app.data.remote.TransactionDto
 import com.quan.finance_app.ui.components.core.*
+import com.quan.finance_app.ui.components.forms.DateTimePickerSheet
 import com.quan.finance_app.ui.theme.*
 import com.quan.finance_app.ui.transaction.AllTransactionsViewModel
 import java.text.NumberFormat
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.util.Currency
 import java.util.Locale
 
-data class LedgerEntry(
-    val id: String = "",
-    val title: String,
-    val meta: String,
-    val amount: Long,
-    val icon: ImageVector,
-    val isIncome: Boolean = false
-)
+internal fun transactionKind(type: String) = when (type) {
+    "INCOME" -> "Thu nhập"
+    "EXPENSE" -> "Chi tiêu"
+    "TRANSFER_IN" -> "Chuyển đến"
+    "TRANSFER_OUT" -> "Chuyển đi"
+    "ADJUSTMENT" -> "Điều chỉnh"
+    else -> type
+}
 
-data class LedgerDay(
-    val label: String,
-    val total: Long,
-    val entries: List<LedgerEntry>
-)
+internal fun TransactionDto.displayTitle() =
+    listOf(merchant, note, categoryName).firstOrNull { !it.isNullOrBlank() } ?: "Giao dịch"
+
+internal fun ledgerAmount(minor: Long, code: String): String {
+    val currency = Currency.getInstance(code.trim())
+    val places = currency.defaultFractionDigits.coerceAtLeast(0)
+    val formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("vi-VN"))
+    formatter.currency = currency
+    formatter.minimumFractionDigits = places
+    formatter.maximumFractionDigits = places
+    return formatter.format(java.math.BigDecimal.valueOf(minor, places))
+}
+
+internal fun signedVnd(amount: Long): String =
+    (if (amount < 0) "−" else "+") + formatVnd(kotlin.math.abs(amount))
 
 @Composable
 fun AllTransactionsScreen(
@@ -56,260 +53,97 @@ fun AllTransactionsScreen(
     onOpenTransaction: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val uiState by allTransactionsViewModel.state.collectAsState()
-    var query by remember { mutableStateOf("") }
-    var flowFilter by remember { mutableStateOf<String?>("ALL") } // "ALL", "EXPENSE", "INCOME"
-
-    val today = remember { LocalDate.now() }
-    val yesterday = remember { LocalDate.now().minusDays(1) }
-
-    // Map and group transactions by date
-    val groupedDays = remember(uiState.transactions, query, flowFilter) {
-        val filtered = uiState.transactions.filter { txn ->
-            val matchFlow = when (flowFilter) {
-                "EXPENSE" -> txn.type == "EXPENSE"
-                "INCOME" -> txn.type == "INCOME"
-                else -> true
-            }
-            val matchQuery = query.isBlank() ||
-                    (txn.note?.contains(query, ignoreCase = true) == true) ||
-                    (txn.categoryName?.contains(query, ignoreCase = true) == true) ||
-                    (txn.merchant?.contains(query, ignoreCase = true) == true) ||
-                    txn.amount.toString().contains(query)
-
-            matchFlow && matchQuery
-        }
-
-        filtered
-            .groupBy { it.occurredDate }
-            .map { (dateStr, txns) ->
-                val date = runCatching { LocalDate.parse(dateStr) }.getOrNull()
-                val label = when (date) {
-                    today -> "HÔM NAY · ${date.format(DateTimeFormatter.ofPattern("dd/MM"))}"
-                    yesterday -> "HÔM QUA · ${date.format(DateTimeFormatter.ofPattern("dd/MM"))}"
-                    null -> dateStr
-                    else -> "NGÀY · ${date.format(DateTimeFormatter.ofPattern("dd/MM"))}"
-                }
-                val totalSigned = txns.sumOf { it.signedAmount }
-                val entries = txns.map { txn ->
-                    val isIncome = txn.type == "INCOME"
-                    LedgerEntry(
-                        id = txn.id,
-                        title = txn.merchant?.ifBlank { null } ?: txn.note?.ifBlank { null } ?: txn.categoryName ?: "Giao dịch",
-                        meta = (txn.categoryName ?: "Chưa phân loại") + (txn.walletName?.let { " · $it" } ?: ""),
-                        amount = txn.signedAmount,
-                        icon = getCategoryIcon(txn.categoryName),
-                        isIncome = isIncome
-                    )
-                }
-                LedgerDay(label = label, total = totalSigned, entries = entries)
-            }
-    }
-
-    val totalOut = remember(uiState.transactions) {
-        uiState.transactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
-    }
-    val totalIn = remember(uiState.transactions) {
-        uiState.transactions.filter { it.type == "INCOME" }.sumOf { it.amount }
-    }
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MoneyFlowTheme.colors.surfacePage),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 20.dp, end = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    val state by allTransactionsViewModel.state.collectAsState()
+    val filter = state.filter
+    val change = allTransactionsViewModel::setFilter
+    var dateEdge by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(allTransactionsViewModel) { allTransactionsViewModel.open() }
+    val days = remember(state.transactions) { state.transactions.groupBy { it.occurredDate } }
+    LazyColumn(modifier.fillMaxSize().background(MoneyFlowTheme.colors.surfacePage),
+        contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { MfScreenHeader("Tất cả giao dịch", onBack) }
         item {
-            MfScreenHeader(
-                title = "Tất cả giao dịch",
-                onBack = onBack,
-                actionIcon = Icons.Outlined.Tune
-            )
+            OutlinedTextField(filter.q, { change(filter.copy(q = it)) }, Modifier.fillMaxWidth(),
+                label = { Text("Tìm theo tên, số tiền, ghi chú") }, singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done))
         }
-
-        // Ô tìm kiếm
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                shadowElevation = 2.dp,
-                border = BorderStroke(1.dp, MoneyFlowTheme.colors.borderSubtle)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MoneyFlowTheme.colors.textTertiary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (query.isEmpty()) {
-                            Text(
-                                text = "Tìm theo tên, số tiền, ghi chú…",
-                                fontFamily = FontCore,
-                                fontSize = 14.sp,
-                                color = MoneyFlowTheme.colors.textTertiary
-                            )
-                        }
-                        BasicTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            singleLine = true,
-                            textStyle = TextStyle(
-                                fontFamily = FontCore,
-                                fontSize = 14.sp,
-                                color = MoneyFlowTheme.colors.textPrimary
-                            ),
-                            cursorBrush = SolidColor(MoneyFlowTheme.colors.textPrimary),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterMenu("Loại", filter.type, listOf("INCOME" to "Thu nhập", "EXPENSE" to "Chi tiêu")) {
+                    change(filter.copy(type = it))
+                }
+                FilterMenu("Ví", filter.walletId, state.wallets.map { it.id to it.name }) {
+                    change(filter.copy(walletId = it))
+                }
+                FilterMenu("Danh mục", filter.categoryId, state.categories.map { it.id to it.name }) {
+                    change(filter.copy(categoryId = it))
                 }
             }
         }
-
-        // Chip lọc
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MfPillChip(
-                    label = "Tất cả",
-                    selected = flowFilter == "ALL",
-                    onClick = { flowFilter = "ALL" }
-                )
-                MfPillChip(
-                    label = "Chỉ chi tiêu",
-                    selected = flowFilter == "EXPENSE",
-                    onClick = { flowFilter = "EXPENSE" }
-                )
-                MfPillChip(
-                    label = "Chỉ thu nhập",
-                    selected = flowFilter == "INCOME",
-                    onClick = { flowFilter = "INCOME" }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton({ dateEdge = "from" }) { Text(filter.from ?: "Từ ngày") }
+                TextButton({ dateEdge = "to" }) { Text(filter.to ?: "Đến ngày") }
+                if (filter.from != null || filter.to != null) TextButton({
+                    change(filter.copy(from = null, to = null))
+                }) { Text("Bỏ lọc ngày") }
             }
         }
-
-        // Tổng quan
-        item {
+        if (state.optionsError) item {
+            TextButton(allTransactionsViewModel::loadOptions) { Text("Chưa tải được ví/danh mục · Thử lại") }
+        }
+        if (state.totals.isNotEmpty() || state.transactions.isNotEmpty()) item {
             MfCard {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SummaryCell("Tiền ra", "−" + formatVnd(totalOut), Heat600, Modifier.weight(1f))
-                    VerticalDivider(
-                        modifier = Modifier.height(30.dp),
-                        color = MoneyFlowTheme.colors.borderSubtle
-                    )
-                    SummaryCell("Tiền vào", "+" + formatVnd(totalIn), Grow600, Modifier.weight(1f))
-                    VerticalDivider(
-                        modifier = Modifier.height(30.dp),
-                        color = MoneyFlowTheme.colors.borderSubtle
-                    )
-                    Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text(
-                            text = "${uiState.transactions.size} giao dịch",
-                            fontFamily = FontCore,
-                            fontSize = 10.sp,
-                            color = MoneyFlowTheme.colors.textSecondary
-                        )
+                Column(Modifier.padding(12.dp)) {
+                    Text("${state.count} giao dịch")
+                    state.totals.forEach {
+                        Text("Thu ${ledgerAmount(it.totalIncome, it.currencyCode)} · Chi ${ledgerAmount(it.totalExpense, it.currencyCode)}")
                     }
                 }
             }
         }
-
-        if (uiState.isLoading) {
-            // Skeleton Loading Placeholders
-            items(3) {
-                AllTransactionsDaySkeleton()
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        } else if (groupedDays.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (query.isNotBlank()) "Không có giao dịch nào khớp “$query”." else "Chưa có giao dịch nào.",
-                        fontFamily = FontCore,
-                        fontSize = 14.sp,
-                        color = MoneyFlowTheme.colors.textSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        } else {
-            // Nhóm theo ngày
-            groupedDays.forEach { day ->
-                item {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    MfSectionLabel(day.label, trailing = signedVnd(day.total))
-                }
-                item {
-                    MfCard {
-                        day.entries.forEachIndexed { index, entry ->
-                            MfRow(
-                                title = entry.title,
-                                icon = entry.icon,
-                                iconTint = if (entry.isIncome) Grow600 else Heat600,
-                                iconBackground = if (entry.isIncome) Grow50 else Heat50,
-                                subtitle = entry.meta,
-                                onClick = { onOpenTransaction(entry.title) },
-                                trailing = {
-                                    Text(
-                                        text = signedVnd(entry.amount),
-                                        fontFamily = FontMono,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = if (entry.isIncome) Grow600 else MoneyFlowTheme.colors.textPrimary
-                                    )
-                                }
-                            )
-                            if (index != day.entries.lastIndex) {
-                                HorizontalDivider(color = MoneyFlowTheme.colors.borderSubtle)
-                            }
-                        }
-                    }
+        days.forEach { (date, transactions) ->
+            item(key = "day-$date") { MfSectionLabel(date) }
+            items(transactions, key = { it.id }) { txn ->
+                MfCard {
+                    MfRow(title = txn.displayTitle(), icon = getCategoryIcon(txn.categoryName),
+                        subtitle = listOfNotNull(transactionKind(txn.type), txn.categoryName, txn.walletName).joinToString(" · "),
+                        onClick = { onOpenTransaction(txn.displayTitle()) },
+                        trailing = { Text(ledgerAmount(txn.signedAmount, txn.currencyCode)) })
                 }
             }
         }
+        item {
+            when {
+                state.error != null -> TextButton(allTransactionsViewModel::next) { Text("${state.error} Thử lại") }
+                state.loading -> CircularProgressIndicator()
+                state.nextPage != null -> LaunchedEffect(state.nextPage) { allTransactionsViewModel.next() }
+                state.transactions.isEmpty() -> Text("Không có giao dịch phù hợp.")
+            }
+        }
+    }
+    dateEdge?.let { edge ->
+        val selected = if (edge == "from") filter.from else filter.to
+        DateTimePickerSheet(onDismissRequest = { dateEdge = null }, onDateSelected = {
+            val date = it.toString()
+            change(if (edge == "from") filter.copy(from = date, to = filter.to?.coerceAtLeast(date))
+                else filter.copy(to = date, from = filter.from?.coerceAtMost(date)))
+        }, brandColor = Blue600, brandSoftColor = Blue50,
+            initialDate = selected?.let(LocalDate::parse) ?: LocalDate.now())
     }
 }
 
 @Composable
-private fun SummaryCell(label: String, amount: String, color: Color, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(end = 12.dp)) {
-        Text(
-            text = label,
-            fontFamily = FontCore,
-            fontSize = 10.sp,
-            color = MoneyFlowTheme.colors.textSecondary
-        )
-        Text(
-            text = amount,
-            fontFamily = FontMono,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 13.sp,
-            color = color
-        )
+private fun FilterMenu(label: String, selected: String?, values: List<Pair<String, String>>,
+                       select: (String?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton({ expanded = true }) { Text(values.find { it.first == selected }?.second ?: label) }
+        DropdownMenu(expanded, { expanded = false }) {
+            DropdownMenuItem({ Text("Tất cả · $label") }, { select(null); expanded = false })
+            values.forEach { (id, name) ->
+                DropdownMenuItem({ Text(name) }, { select(id); expanded = false })
+            }
+        }
     }
-}
-
-internal fun signedVnd(amount: Long): String {
-    val sign = if (amount < 0) "−" else "+"
-    return sign + formatVnd(kotlin.math.abs(amount))
 }
