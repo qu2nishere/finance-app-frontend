@@ -1,11 +1,10 @@
 package com.quan.finance_app.data
 
 import com.quan.finance_app.data.remote.*
-import java.util.UUID
+import kotlinx.coroutines.CancellationException
 
 class LedgerRepository(private val api: LedgerApi) {
 
-    private var cachedCategories: List<CategoryDto>? = null
 
     companion object {
         val DEFAULT_CATEGORIES: List<CategoryDto> = listOf(
@@ -48,99 +47,49 @@ class LedgerRepository(private val api: LedgerApi) {
         )
     }
 
-    suspend fun getCategories(forceRefresh: Boolean = false): Result<List<CategoryDto>> {
-        if (!forceRefresh && cachedCategories != null && cachedCategories!!.isNotEmpty()) {
-            return Result.success(cachedCategories!!)
-        }
-        return runCatching {
-            val list = api.getCategories()
-            if (list.isNotEmpty()) {
-                cachedCategories = list
-                list
-            } else {
-                cachedCategories = DEFAULT_CATEGORIES
-                DEFAULT_CATEGORIES
-            }
-        }.recover {
-            // Khi gặp lỗi kết nối hoặc server chưa có dữ liệu, trả về danh sách mặc định
-            cachedCategories = DEFAULT_CATEGORIES
-            DEFAULT_CATEGORIES
-        }
-    }
+    suspend fun history(page: Int, filter: HistoryFilter): HistoryPageDto =
+        api.history(page, filter.q.trim().ifEmpty { null }, filter.from, filter.to,
+            filter.walletId, filter.categoryId, filter.type)
 
-    suspend fun createCategory(body: CreateCategoryDto): Result<CategoryDto> {
-        return runCatching {
-            val created = api.createCategory(body)
-            cachedCategories = (cachedCategories ?: emptyList()) + created
-            created
-        }.recover {
-            // Fallback khi offline hoặc lỗi mạng: tạo cục bộ để không gián đoạn trải nghiệm người dùng
-            val local = CategoryDto(
-                id = UUID.randomUUID().toString(),
-                parentId = null,
-                name = body.name,
-                flow = body.flow,
-                icon = body.icon ?: "Category",
-                color = body.color ?: (if (body.flow == "EXPENSE") "#EF4444" else "#16A34A"),
-                system = false,
-                usageCount = 0
-            )
-            cachedCategories = (cachedCategories ?: emptyList()) + local
-            local
-        }
-    }
+    suspend fun getCategories(): Result<List<CategoryDto>> = ledgerCall { api.getCategories() }
 
-    suspend fun getWallets(): Result<List<WalletDto>> {
-        return runCatching {
-            val list = api.getWallets()
-            if (list.isNotEmpty()) list else DEFAULT_WALLETS
-        }.recover {
-            DEFAULT_WALLETS
-        }
-    }
+    suspend fun createCategory(body: CreateCategoryDto): Result<CategoryDto> =
+        ledgerCall { api.createCategory(body) }
 
-    suspend fun createWallet(body: CreateWalletDto): Result<WalletDto> {
-        return runCatching {
-            api.createWallet(body)
-        }.recover {
-            WalletDto(
-                id = UUID.randomUUID().toString(),
-                name = body.name,
-                kind = body.kind,
-                currencyCode = "VND",
-                initialBalance = body.initialBalance,
-                currentBalance = body.initialBalance,
-                icon = body.icon ?: "AccountBalanceWallet",
-                color = body.color ?: "#2563EB",
-                includeInTotal = true,
-                displayOrder = 99,
-                note = body.note
-            )
-        }
+    suspend fun getWallets(): Result<List<WalletDto>> = ledgerCall { api.getWallets() }
+
+    suspend fun createWallet(body: CreateWalletDto): Result<WalletDto> = ledgerCall { api.createWallet(body) }
+
+    private suspend fun <T> ledgerCall(action: suspend () -> T): Result<T> = try {
+        Result.success(action())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
     }
 
     suspend fun getMonthlySummary(): Result<MonthlySummaryDto> {
-        return runCatching { api.getMonthlySummary() }
+        return ledgerCall { api.getMonthlySummary() }
     }
 
     suspend fun getRecentTransactions(size: Int = 5): Result<List<TransactionDto>> {
-        return runCatching {
+        return ledgerCall {
             val page = api.getTransactions(page = 0, size = size)
             page.content
         }
     }
 
     suspend fun getTransactionsPaged(page: Int = 0, size: Int = 20): Result<PageDto<TransactionDto>> {
-        return runCatching {
+        return ledgerCall {
             api.getTransactions(page = page, size = size)
         }
     }
 
     suspend fun createTransaction(body: CreateTransactionDto): Result<TransactionDto> {
-        return runCatching { api.createTransaction(body) }
+        return ledgerCall { api.createTransaction(body) }
     }
 
     suspend fun deleteTransaction(id: String): Result<Unit> {
-        return runCatching { api.deleteTransaction(id) }
+        return ledgerCall { api.deleteTransaction(id) }
     }
 }

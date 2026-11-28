@@ -7,6 +7,7 @@ import com.quan.finance_app.data.ServiceLocator
 import com.quan.finance_app.data.remote.CategoryDto
 import com.quan.finance_app.data.remote.CreateTransactionDto
 import com.quan.finance_app.data.remote.WalletDto
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,8 +37,9 @@ class TransactionViewModel(
     private val _state = MutableStateFlow(TransactionUiState())
     val state: StateFlow<TransactionUiState> = _state.asStateFlow()
 
-    init {
-        loadData()
+    fun reset() {
+        viewModelScope.coroutineContext.cancelChildren()
+        _state.value = TransactionUiState()
     }
 
     fun loadData() {
@@ -47,12 +49,9 @@ class TransactionViewModel(
                 coroutineScope {
                     val catDef = async { ledgerRepository.getCategories() }
                     val walDef = async { ledgerRepository.getWallets() }
-                    catDef.await() to walDef.await()
+                    catDef.await().getOrThrow() to walDef.await().getOrThrow()
                 }
-            }.onSuccess { (catRes, walRes) ->
-                val categories = catRes.getOrNull() ?: emptyList()
-                val wallets = walRes.getOrNull() ?: emptyList()
-
+            }.onSuccess { (categories, wallets) ->
                 val firstWallet = wallets.firstOrNull()
                 val defaultCategory = categories.firstOrNull {
                     if (_state.value.isExpense) it.flow == "EXPENSE" else it.flow == "INCOME"
@@ -69,6 +68,7 @@ class TransactionViewModel(
                     )
                 }
             }.onFailure { err ->
+                if (err is kotlinx.coroutines.CancellationException) throw err
                 _state.update {
                     it.copy(isLoading = false, errorMessage = err.message ?: "Không tải được danh mục/ví")
                 }

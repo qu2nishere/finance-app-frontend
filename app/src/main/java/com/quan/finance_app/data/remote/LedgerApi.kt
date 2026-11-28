@@ -22,6 +22,17 @@ interface LedgerApi {
         @Query("size") size: Int = 20
     ): PageDto<TransactionDto>
 
+    @GET("api/transactions/history")
+    suspend fun history(
+        @Query("page") page: Int,
+        @Query("q") q: String?,
+        @Query("from") from: String?,
+        @Query("to") to: String?,
+        @Query("walletId") walletId: String?,
+        @Query("categoryId") categoryId: String?,
+        @Query("type") type: String?
+    ): HistoryPageDto
+
     @GET("api/transactions/summary")
     suspend fun getMonthlySummary(): MonthlySummaryDto
 
