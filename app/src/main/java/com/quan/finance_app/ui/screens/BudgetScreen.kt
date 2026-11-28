@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +41,7 @@ import com.quan.finance_app.ui.components.core.MfTabHeader
 import com.quan.finance_app.ui.theme.*
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetRoute(
     onNavigateToSavingsGoals: () -> Unit = {},
@@ -57,20 +59,26 @@ fun BudgetRoute(
         goalsViewModel.load()
     }
 
-    BudgetScreen(
-        state = state,
-        activeGoals = goalsState.activeGoals.take(2),
-        onRefresh = {
-            budgetViewModel.load()
-            goalsViewModel.load()
-        },
-        onOpenAddLimit = budgetViewModel::openCreateSheet,
-        onEditLimit = budgetViewModel::openEditSheet,
-        onNavigateToSavingsGoals = onNavigateToSavingsGoals,
-        onCreateFirstGoal = onCreateGoal,
-        onOpenGoal = onEditGoal,
-        modifier = modifier
-    )
+    val refresh = {
+        budgetViewModel.load()
+        goalsViewModel.load()
+    }
+    PullToRefreshBox(
+        isRefreshing = state.loading,
+        onRefresh = refresh,
+        modifier = modifier.fillMaxSize()
+    ) {
+        BudgetScreen(
+            state = state,
+            activeGoals = goalsState.activeGoals.take(2),
+            onRefresh = refresh,
+            onOpenAddLimit = budgetViewModel::openCreateSheet,
+            onEditLimit = budgetViewModel::openEditSheet,
+            onNavigateToSavingsGoals = onNavigateToSavingsGoals,
+            onCreateFirstGoal = onCreateGoal,
+            onOpenGoal = onEditGoal
+        )
+    }
 
     if (state.sheetOpen) {
         AddCategoryLimitSheet(

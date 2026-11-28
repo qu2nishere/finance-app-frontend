@@ -219,8 +219,23 @@ fun MainApp(
         addSheetStartsWithIncome = income
         showAddSheet = true
     }
+    val detailState by detailViewModel.state.collectAsState()
     fun pop() {
+        if (detailState.deleting && backStack.lastOrNull() is Route.TransactionDetail) return
         if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
+    }
+
+    LaunchedEffect(detailState.removal) {
+        val result = detailState.removal ?: return@LaunchedEffect
+        if (auth.session == SessionStatus.LoggedIn) {
+            historyViewModel.refreshIfOpened()
+            homeViewModel.loadData()
+            if ((backStack.lastOrNull() as? Route.TransactionDetail)?.id == detailState.id) pop()
+            val message = if (result == com.quan.finance_app.ui.transaction.Removal.DELETED)
+                "Đã xoá giao dịch." else "Giao dịch không còn tồn tại"
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+        detailViewModel.reset()
     }
 
     if (auth.session == SessionStatus.Checking) {

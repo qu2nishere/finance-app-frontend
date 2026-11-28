@@ -46,6 +46,7 @@ class TokenStore(
         isPersisted = prefs.contains(KEY_REFRESH_ENC)
     }
 
+    @get:Synchronized
     val refreshToken: String?
         get() {
             ramRefreshToken?.let { return it }
@@ -65,9 +66,11 @@ class TokenStore(
     val isLoggedIn: Boolean
         get() = accessToken != null || refreshToken != null
 
+    @get:Synchronized
     val userId: String?
         get() = ramUserId ?: prefs.getString(KEY_USER_ID, null)?.also { ramUserId = it }
 
+    @Synchronized
     fun save(
         access: String,
         refresh: String?,
@@ -106,6 +109,7 @@ class TokenStore(
         editor.apply()
     }
 
+    @Synchronized
     fun clear() {
         accessToken = null
         ramRefreshToken = null

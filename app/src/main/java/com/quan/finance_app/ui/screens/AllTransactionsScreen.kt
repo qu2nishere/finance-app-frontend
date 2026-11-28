@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
@@ -58,9 +59,22 @@ fun AllTransactionsScreen(
     val change = allTransactionsViewModel::setFilter
     var dateEdge by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(allTransactionsViewModel) { allTransactionsViewModel.open() }
+    val listState = rememberLazyListState()
+    val nearEnd by remember {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            val last = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
+            last >= 0 && last >= layout.totalItemsCount - 3
+        }
+    }
+    LaunchedEffect(nearEnd, state.nextPage, state.loading, state.error) {
+        if (nearEnd && !state.loading && state.error == null && state.transactions.isNotEmpty()) {
+            allTransactionsViewModel.next()
+        }
+    }
     val days = remember(state.transactions) { state.transactions.groupBy { it.occurredDate } }
     LazyColumn(modifier.fillMaxSize().background(MoneyFlowTheme.colors.surfacePage),
-        contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        state = listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { MfScreenHeader("Tất cả giao dịch", onBack) }
         item {
             OutlinedTextField(filter.q, { change(filter.copy(q = it)) }, Modifier.fillMaxWidth(),
@@ -117,7 +131,7 @@ fun AllTransactionsScreen(
             when {
                 state.error != null -> TextButton(allTransactionsViewModel::next) { Text("${state.error} Thử lại") }
                 state.loading -> CircularProgressIndicator()
-                state.nextPage != null -> LaunchedEffect(state.nextPage) { allTransactionsViewModel.next() }
+                state.nextPage != null -> TextButton(allTransactionsViewModel::next) { Text("Tải thêm giao dịch") }
                 state.transactions.isEmpty() -> Text("Không có giao dịch phù hợp.")
             }
         }

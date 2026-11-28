@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,6 +75,7 @@ private val REPORT_DAY_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPatter
 private val REPORT_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val REPORT_ZONE: ZoneId = ZoneId.of("Asia/Ho_Chi_Minh")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportRoute(
     reportViewModel: ReportViewModel = viewModel(),
@@ -83,17 +85,22 @@ fun ReportRoute(
     LaunchedEffect(Unit) {
         reportViewModel.refresh()
     }
-    ReportScreen(
-        state = state,
-        onSelectTab = reportViewModel::selectTab,
-        onPreviousMonth = reportViewModel::goPreviousMonth,
-        onNextMonth = reportViewModel::goNextMonth,
-        onSelectIncomeCategory = reportViewModel::selectIncomeCategory,
-        onPickDate = reportViewModel::selectDate,
-        onClearDate = reportViewModel::clearDateFilter,
+    PullToRefreshBox(
+        isRefreshing = state.isTransactionsLoading || state.isTrendLoading || state.isCashflowLoading,
         onRefresh = reportViewModel::refresh,
-        modifier = modifier
-    )
+        modifier = modifier.fillMaxSize()
+    ) {
+        ReportScreen(
+            state = state,
+            onSelectTab = reportViewModel::selectTab,
+            onPreviousMonth = reportViewModel::goPreviousMonth,
+            onNextMonth = reportViewModel::goNextMonth,
+            onSelectIncomeCategory = reportViewModel::selectIncomeCategory,
+            onPickDate = reportViewModel::selectDate,
+            onClearDate = reportViewModel::clearDateFilter,
+            onRefresh = reportViewModel::refresh
+        )
+    }
 }
 
 @Composable
